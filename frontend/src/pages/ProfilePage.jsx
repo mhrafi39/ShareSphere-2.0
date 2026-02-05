@@ -1,0 +1,496 @@
+import { useState, useEffect } from 'react';
+import { useParams, useLocation, Link } from 'react-router-dom';
+import { motion } from 'framer-motion';
+import { useDispatch, useSelector } from 'react-redux';
+import { dummyUser, dummyPosts } from '../utils/dummyData';
+import { updateVerificationStatus } from '../features/authSlice';
+import ProfileCard from '../components/ProfileCard';
+import PostCard from '../components/PostCard';
+import Button from '../components/Button';
+import Modal from '../components/Modal';
+import Input from '../components/Input';
+
+const ProfilePage = () => {
+  const { userId } = useParams();
+  const location = useLocation();
+  const dispatch = useDispatch();
+  const currentUser = useSelector((state) => state.auth.user) || dummyUser;
+  
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isVerificationModalOpen, setIsVerificationModalOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState('posts');
+  const [showVerificationAlert, setShowVerificationAlert] = useState(false);
+  
+  // NID Verification Form
+  const [nidNumber, setNidNumber] = useState('');
+  const [nidImage, setNidImage] = useState(null);
+  const [nidPreview, setNidPreview] = useState(null);
+  
+  // If userId is provided, find that user's data, otherwise use current user
+  const isOwnProfile = !userId || userId === currentUser._id;
+  const profileUser = userId && !isOwnProfile 
+    ? dummyPosts.find(post => post.author._id === userId)?.author || currentUser
+    : currentUser;
+  
+  // Filter user's posts
+  const userPosts = dummyPosts.filter(post => post.author._id === (userId || currentUser._id));
+
+  // Show alert if redirected from create page
+  useEffect(() => {
+    if (location.state?.needsVerification) {
+      setShowVerificationAlert(true);
+      setTimeout(() => setShowVerificationAlert(false), 5000);
+    }
+  }, [location]);
+
+  const handleNidImageChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setNidImage(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setNidPreview(reader.result);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleSubmitVerification = () => {
+    if (!nidNumber || !nidImage) {
+      alert('Please provide both NID number and NID image');
+      return;
+    }
+
+    // TODO: Call API - POST /api/verification/submit
+    dispatch(updateVerificationStatus({
+      status: 'pending',
+      nid: nidNumber,
+      nidImage: nidPreview,
+    }));
+
+    setIsVerificationModalOpen(false);
+    alert('NID submitted successfully! Your verification is pending admin approval.');
+  };
+
+  const getVerificationBadge = () => {
+    switch (profileUser.verificationStatus) {
+      case 'verified':
+        return (
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-lg">
+            <span className="text-lg">🟢</span>
+            <span className="text-sm font-medium">Verified</span>
+          </div>
+        );
+      case 'pending':
+        return (
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 rounded-lg">
+            <span className="text-lg">🟡</span>
+            <span className="text-sm font-medium">Pending Verification</span>
+          </div>
+        );
+      case 'rejected':
+        return (
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 rounded-lg">
+            <span className="text-lg">🔴</span>
+            <span className="text-sm font-medium">Verification Rejected</span>
+          </div>
+        );
+      default:
+        return (
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg">
+            <span className="text-lg">⚪</span>
+            <span className="text-sm font-medium">Unverified</span>
+          </div>
+        );
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-8">
+      <div className="container-custom">
+        {/* Verification Alert */}
+        {showVerificationAlert && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            className="mb-6 bg-yellow-100 dark:bg-yellow-900/30 border-l-4 border-yellow-500 text-yellow-700 dark:text-yellow-300 p-4 rounded-lg"
+          >
+            <div className="flex">
+              <div className="flex-shrink-0">
+                <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="ml-3">
+                <p className="text-sm font-medium">
+                  You must verify your NID to create posts.
+                </p>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Profile Card - Sidebar */}
+          <div className="lg:col-span-1 space-y-4">
+            <ProfileCard user={profileUser} />
+            
+            {/* Verification Badge */}
+            {isOwnProfile && (
+              <div className="bg-white dark:bg-gray-800 rounded-xl shadow-soft p-4">
+                <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                  Verification Status
+                </h3>
+                {getVerificationBadge()}
+                
+                {currentUser.verificationStatus === 'unverified' && (
+                  <Link to="/verify-nid">
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      className="w-full mt-3 flex items-center justify-center gap-2"
+                    >
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                      </svg>
+                      Apply for Verification
+                    </Button>
+                  </Link>
+                )}
+                
+                {currentUser.verificationStatus === 'rejected' && (
+                  <Link to="/verify-nid">
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      className="w-full mt-3 flex items-center justify-center gap-2"
+                    >
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
+                      Reapply for Verification
+                    </Button>
+                  </Link>
+                )}
+                
+                {currentUser.verificationStatus === 'pending' && (
+                  <>
+                    <div className="mt-3 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+                      <p className="text-xs text-yellow-800 dark:text-yellow-200 flex items-center gap-2">
+                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
+                        </svg>
+                        Your verification is under review. We'll notify you within 24-48 hours.
+                      </p>
+                    </div>
+                  </>
+                )}
+                
+                {currentUser.verificationStatus === 'verified' && (
+                  <div className="mt-3 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+                    <p className="text-xs text-green-800 dark:text-green-200 flex items-center gap-2">
+                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                      </svg>
+                      Your account is verified! You can now share resources.
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+            
+            {isOwnProfile && (
+              <Button
+                variant="primary"
+                className="w-full"
+                onClick={() => setIsEditModalOpen(true)}
+              >
+                Edit Profile
+              </Button>
+            )}
+          </div>
+
+          {/* Main Content */}
+          <div className="lg:col-span-2 space-y-6">
+            {/* Tabs */}
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-soft p-1 flex gap-1">
+              <TabButton
+                active={activeTab === 'posts'}
+                onClick={() => setActiveTab('posts')}
+              >
+                {isOwnProfile ? 'My Posts' : 'Posts'} ({userPosts.length})
+              </TabButton>
+              {isOwnProfile && (
+                <TabButton
+                  active={activeTab === 'saved'}
+                  onClick={() => setActiveTab('saved')}
+                >
+                  Saved (0)
+                </TabButton>
+              )}
+              <TabButton
+                active={activeTab === 'activity'}
+                onClick={() => setActiveTab('activity')}
+              >
+                Activity
+              </TabButton>
+            </div>
+
+            {/* Tab Content */}
+            <div>
+              {activeTab === 'posts' && (
+                <div className="space-y-6">
+                  {userPosts.length > 0 ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      {userPosts.map((post) => (
+                        <PostCard key={post._id} post={post} />
+                      ))}
+                    </div>
+                  ) : (
+                    <EmptyState
+                      icon="📝"
+                      title="No posts yet"
+                      description="Start sharing resources with your community"
+                    />
+                  )}
+                </div>
+              )}
+
+              {activeTab === 'saved' && (
+                <EmptyState
+                  icon="🔖"
+                  title="No saved resources"
+                  description="Resources you save will appear here"
+                />
+              )}
+
+              {activeTab === 'activity' && (
+                <div className="bg-white dark:bg-gray-800 rounded-xl shadow-soft p-6">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
+                    Recent Activity
+                  </h3>
+                  <div className="space-y-4">
+                    {[
+                      { action: 'Posted a resource', item: 'Laptop for Coding Projects', time: '2 hours ago' },
+                      { action: 'Saved', item: 'Programming Books Collection', time: '5 hours ago' },
+                      { action: 'Liked', item: 'DSLR Camera Kit', time: '1 day ago' },
+                    ].map((activity, index) => (
+                      <div key={index} className="flex items-start gap-3 pb-4 border-b border-gray-200 dark:border-gray-700 last:border-0">
+                        <div className="w-2 h-2 bg-primary-600 rounded-full mt-2"></div>
+                        <div className="flex-1">
+                          <p className="text-gray-900 dark:text-gray-100">
+                            <span className="font-medium">{activity.action}</span>{' '}
+                            <span className="text-primary-600 dark:text-primary-400">{activity.item}</span>
+                          </p>
+                          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{activity.time}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Edit Profile Modal */}
+      <Modal
+        isOpen={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+        title="Edit Profile"
+      >
+        <form className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium mb-2">Profile Picture</label>
+            <div className="flex items-center gap-4">
+              <img
+                src={dummyUser.avatar}
+                alt="Profile"
+                className="w-20 h-20 rounded-full"
+              />
+              <Button variant="outline" size="sm">
+                Change Photo
+              </Button>
+            </div>
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium mb-2">Name</label>
+            <input
+              type="text"
+              defaultValue={dummyUser.name}
+              className="w-full px-4 py-2 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-2">Bio</label>
+            <textarea
+              rows={3}
+              defaultValue={dummyUser.bio}
+              className="w-full px-4 py-2 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-2">Location</label>
+            <input
+              type="text"
+              defaultValue={dummyUser.location}
+              className="w-full px-4 py-2 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
+            />
+          </div>
+
+          <div className="flex gap-3 pt-4">
+            <Button variant="primary" className="flex-1">
+              Save Changes
+            </Button>
+            <Button
+              variant="secondary"
+              className="flex-1"
+              onClick={() => setIsEditModalOpen(false)}
+            >
+              Cancel
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* NID Verification Modal */}
+      <Modal
+        isOpen={isVerificationModalOpen}
+        onClose={() => setIsVerificationModalOpen(false)}
+        title="Submit NID for Verification"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            To create posts, you need to verify your identity with your National ID (NID).
+          </p>
+
+          <div>
+            <Input
+              label="NID Number"
+              type="text"
+              placeholder="Enter your NID number"
+              value={nidNumber}
+              onChange={(e) => setNidNumber(e.target.value)}
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              NID Card Image <span className="text-red-500">*</span>
+            </label>
+            <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl p-6">
+              {nidPreview ? (
+                <div className="relative">
+                  <img
+                    src={nidPreview}
+                    alt="NID Preview"
+                    className="w-full rounded-lg"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setNidImage(null);
+                      setNidPreview(null);
+                    }}
+                    className="absolute top-2 right-2 p-2 bg-red-500 text-white rounded-lg hover:bg-red-600"
+                  >
+                    Remove
+                  </button>
+                </div>
+              ) : (
+                <div className="text-center">
+                  <svg
+                    className="mx-auto h-12 w-12 text-gray-400"
+                    stroke="currentColor"
+                    fill="none"
+                    viewBox="0 0 48 48"
+                  >
+                    <path
+                      d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02"
+                      strokeWidth={2}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                  <div className="mt-4">
+                    <label
+                      htmlFor="nid-upload"
+                      className="cursor-pointer px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors inline-block"
+                    >
+                      Upload NID Image
+                    </label>
+                    <input
+                      id="nid-upload"
+                      type="file"
+                      accept="image/*"
+                      onChange={handleNidImageChange}
+                      className="hidden"
+                    />
+                  </div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                    PNG, JPG up to 5MB
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+            <p className="text-sm text-blue-800 dark:text-blue-300">
+              <strong>Note:</strong> Your NID information will be reviewed by our admin team. 
+              This process usually takes 24-48 hours.
+            </p>
+          </div>
+
+          <div className="flex gap-3 pt-4">
+            <Button
+              variant="primary"
+              className="flex-1"
+              onClick={handleSubmitVerification}
+            >
+              Submit for Verification
+            </Button>
+            <Button
+              variant="secondary"
+              className="flex-1"
+              onClick={() => setIsVerificationModalOpen(false)}
+            >
+              Cancel
+            </Button>
+          </div>
+        </div>
+      </Modal>
+    </div>
+  );
+};
+
+const TabButton = ({ active, onClick, children }) => (
+  <button
+    onClick={onClick}
+    className={`flex-1 px-4 py-2 rounded-lg font-medium transition-all ${
+      active
+        ? 'bg-primary-600 text-white shadow-md'
+        : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+    }`}
+  >
+    {children}
+  </button>
+);
+
+const EmptyState = ({ icon, title, description }) => (
+  <div className="bg-white dark:bg-gray-800 rounded-xl shadow-soft p-12 text-center">
+    <div className="text-6xl mb-4">{icon}</div>
+    <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">
+      {title}
+    </h3>
+    <p className="text-gray-600 dark:text-gray-400">{description}</p>
+  </div>
+);
+
+export default ProfilePage;
