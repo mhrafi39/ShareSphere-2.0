@@ -1,11 +1,25 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-const ShareMenu = ({ postId, title }) => {
-  const [isOpen, setIsOpen] = useState(false);
+const ShareMenu = ({ url, title, isOpen, onClose }) => {
   const [showToast, setShowToast] = useState(false);
+  const menuRef = useRef(null);
 
-  const postUrl = `${window.location.origin}/post/${postId}`;
+  const postUrl = url || window.location.href;
+  
+  // Close menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (menuRef.current && !menuRef.current.contains(event.target)) {
+        onClose?.();
+      }
+    };
+    
+    if (isOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [isOpen, onClose]);
   
   const shareOptions = [
     {
@@ -70,52 +84,40 @@ const ShareMenu = ({ postId, title }) => {
         navigator.clipboard.writeText(postUrl);
         setShowToast(true);
         setTimeout(() => setShowToast(false), 2000);
-        setIsOpen(false);
+        onClose?.();
       }
     }
   ];
 
-  return (
-    <div className="relative">
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-1 text-sm text-gray-600 dark:text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
-      >
-        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
-        </svg>
-        <span>Share</span>
-      </button>
+  if (!isOpen) return null;
 
+  return (
+    <>
       <AnimatePresence>
-        {isOpen && (
-          <>
-            <div 
-              className="fixed inset-0 z-40" 
-              onClick={() => setIsOpen(false)}
-            />
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: -10 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: -10 }}
-              transition={{ duration: 0.1 }}
-              className="absolute bottom-full right-0 mb-2 w-56 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 py-2 z-50"
+        <motion.div
+          ref={menuRef}
+          initial={{ opacity: 0, scale: 0.95, y: 10 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.95, y: 10 }}
+          transition={{ duration: 0.15 }}
+          className="absolute bottom-full left-0 mb-2 w-56 bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 py-2 z-50"
+        >
+          <div className="px-3 py-2 border-b border-gray-200 dark:border-gray-700">
+            <p className="text-xs font-medium text-gray-500 dark:text-gray-400">Share this post</p>
+          </div>
+          {shareOptions.map((option) => (
+            <button
+              key={option.name}
+              onClick={option.action}
+              className="w-full px-4 py-2.5 flex items-center gap-3 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-left"
             >
-              {shareOptions.map((option, index) => (
-                <button
-                  key={option.name}
-                  onClick={option.action}
-                  className="w-full px-4 py-2.5 flex items-center gap-3 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-left"
-                >
-                  <span className={option.color}>{option.icon}</span>
-                  <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                    {option.name}
-                  </span>
-                </button>
-              ))}
-            </motion.div>
-          </>
-        )}
+              <span className={option.color}>{option.icon}</span>
+              <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                {option.name}
+              </span>
+            </button>
+          ))}
+        </motion.div>
       </AnimatePresence>
 
       {/* Toast Notification */}
@@ -134,7 +136,7 @@ const ShareMenu = ({ postId, title }) => {
           </motion.div>
         )}
       </AnimatePresence>
-    </div>
+    </>
   );
 };
 

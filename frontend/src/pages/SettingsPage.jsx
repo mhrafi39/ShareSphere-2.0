@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useSelector, useDispatch } from 'react-redux';
 import { updateUser } from '../features/authSlice';
@@ -6,15 +6,18 @@ import { useTheme } from '../hooks/useTheme';
 import Button from '../components/Button';
 import Input from '../components/Input';
 import Modal from '../components/Modal';
-import { dummyUser } from '../utils/dummyData';
+import { authAPI } from '../services/api';
 
 const SettingsPage = () => {
   const dispatch = useDispatch();
-  const currentUser = useSelector((state) => state.auth.user) || dummyUser;
+  const currentUser = useSelector((state) => state.auth.user);
   const { theme, toggleTheme } = useTheme();
   
   const [activeTab, setActiveTab] = useState('account');
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [avatarFile, setAvatarFile] = useState(null);
+  const [avatarPreview, setAvatarPreview] = useState(null);
+  const [isUpdating, setIsUpdating] = useState(false);
   const [notifications, setNotifications] = useState({
     emailNotifications: true,
     pushNotifications: true,
@@ -23,13 +26,29 @@ const SettingsPage = () => {
     verificationUpdates: true,
   });
 
+  // Default profile picture
+  const DEFAULT_PROFILE_PIC = 'https://ui-avatars.com/api/?name=' + 
+    encodeURIComponent(currentUser?.name || 'User') + '&background=random&size=200';
+
   // Account Settings
   const [accountData, setAccountData] = useState({
-    name: currentUser.name,
-    email: currentUser.email,
-    location: currentUser.location || '',
-    bio: currentUser.bio || '',
+    name: currentUser?.name || '',
+    email: currentUser?.email || '',
+    location: currentUser?.location || '',
+    bio: currentUser?.bio || '',
   });
+
+  // Update account data when currentUser changes
+  useEffect(() => {
+    if (currentUser) {
+      setAccountData({
+        name: currentUser.name || '',
+        email: currentUser.email || '',
+        location: currentUser.location || '',
+        bio: currentUser.bio || '',
+      });
+    }
+  }, [currentUser]);
 
   // Privacy Settings
   const [privacySettings, setPrivacySettings] = useState({
@@ -46,9 +65,58 @@ const SettingsPage = () => {
     confirmPassword: '',
   });
 
-  const handleAccountUpdate = () => {
-    dispatch(updateUser(accountData));
-    alert('Account updated successfully!');
+  const handleAvatarChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setAvatarFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setAvatarPreview(reader.result);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleAccountUpdate = async () => {
+    try {
+      setIsUpdating(true);
+      
+      // Create FormData for file upload
+      const formData = new FormData();
+      formData.append('name', accountData.name);
+      formData.append('bio', accountData.bio);
+      formData.append('location', accountData.location);
+      
+      if (avatarFile) {
+        formData.append('avatar', avatarFile);
+      }
+      
+      const response = await authAPI.updateProfile(formData);
+      
+      if (response.data.success) {
+        // Update user in Redux store
+        dispatch(updateUser(response.data.data));
+        
+        // Also update local account data with response
+        setAccountData({
+          name: response.data.data.name || '',
+          email: response.data.data.email || '',
+          location: response.data.data.location || '',
+          bio: response.data.data.bio || '',
+        });
+        
+        // Clear the file input and preview
+        setAvatarFile(null);
+        setAvatarPreview(null);
+        
+        alert('Profile updated successfully!');
+      }
+    } catch (error) {
+      console.error('Profile update error:', error);
+      alert(error.response?.data?.message || 'Failed to update profile');
+    } finally {
+      setIsUpdating(false);
+    }
   };
 
   const handlePasswordChange = () => {
@@ -162,6 +230,41 @@ const SettingsPage = () => {
                   <div className="space-y-6">
                     <div>
                       <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">
+                        Profile Picture
+                      </h2>
+                      <div className="flex items-center gap-6">
+                        <div className="relative">
+                          <img
+                            src={avatarPreview || currentUser?.avatar || DEFAULT_PROFILE_PIC}
+                            alt="Profile"
+                            className="w-24 h-24 rounded-full border-4 border-gray-200 dark:border-gray-700 object-cover"
+                          />
+                        </div>
+                        <div>
+                          <label
+                            htmlFor="avatar-upload"
+                            className="cursor-pointer px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors inline-block"
+                          >
+                            Change Picture
+                          </label>
+                          <input
+                            id="avatar-upload"
+                            type="file"
+                            accept="image/*"
+                            onChange={handleAvatarChange}
+                            className="hidden"
+                          />
+                          <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
+                            JPG, PNG or GIF. Max size 5MB.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <hr className="border-gray-200 dark:border-gray-700" />
+                    
+                    <div>
+                      <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">
                         Account Information
                       </h2>
                       <div className="space-y-4">
@@ -198,8 +301,12 @@ const SettingsPage = () => {
                         </div>
                       </div>
                       <div className="mt-6">
-                        <Button variant="primary" onClick={handleAccountUpdate}>
-                          Save Changes
+                        <Button 
+                          variant="primary" 
+                          onClick={handleAccountUpdate}
+                          disabled={isUpdating}
+                        >
+                          {isUpdating ? 'Updating...' : 'Save Changes'}
                         </Button>
                       </div>
                     </div>

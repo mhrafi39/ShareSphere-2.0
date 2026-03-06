@@ -1,57 +1,67 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import Button from '../components/Button';
 import Modal from '../components/Modal';
-
-// Dummy pending verification users
-const dummyPendingUsers = [
-  {
-    _id: 'u5',
-    name: 'Alice Johnson',
-    email: 'alice@example.com',
-    avatar: 'https://i.pravatar.cc/150?img=5',
-    verificationStatus: 'pending',
-    nid: '9876543210',
-    nidImage: 'https://via.placeholder.com/600x400?text=NID+Card+Sample+1',
-    submittedAt: '2024-01-16T10:30:00Z',
-  },
-  {
-    _id: 'u6',
-    name: 'Bob Smith',
-    email: 'bob@example.com',
-    avatar: 'https://i.pravatar.cc/150?img=6',
-    verificationStatus: 'pending',
-    nid: '1122334455',
-    nidImage: 'https://via.placeholder.com/600x400?text=NID+Card+Sample+2',
-    submittedAt: '2024-01-16T09:15:00Z',
-  },
-  {
-    _id: 'u7',
-    name: 'Carol White',
-    email: 'carol@example.com',
-    avatar: 'https://i.pravatar.cc/150?img=7',
-    verificationStatus: 'pending',
-    nid: '6677889900',
-    nidImage: 'https://via.placeholder.com/600x400?text=NID+Card+Sample+3',
-    submittedAt: '2024-01-15T16:45:00Z',
-  },
-];
+import Sidebar from '../layouts/Sidebar';
+import { adminAPI } from '../services/api';
 
 const AdminVerification = () => {
-  const [users, setUsers] = useState(dummyPendingUsers);
+  const [users, setUsers] = useState([]);
   const [selectedUser, setSelectedUser] = useState(null);
   const [isImageModalOpen, setIsImageModalOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [rejectReason, setRejectReason] = useState('');
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  const handleApprove = (userId) => {
-    // TODO: Call API - PATCH /api/admin/verify/:userId with status: 'verified'
-    setUsers(users.filter(u => u._id !== userId));
-    alert('User verified successfully!');
+  useEffect(() => {
+    fetchPendingVerifications();
+  }, []);
+
+  const fetchPendingVerifications = async () => {
+    try {
+      setLoading(true);
+      const response = await adminAPI.getPendingVerifications();
+      console.log('Pending verifications response:', response.data);
+      if (response.data.success) {
+        console.log('Number of pending users:', response.data.data.length);
+        setUsers(response.data.data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch pending verifications:', error);
+      console.error('Error response:', error.response?.data);
+      alert('Failed to load pending verifications: ' + (error.response?.data?.message || error.message));
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleReject = (userId) => {
-    // TODO: Call API - PATCH /api/admin/verify/:userId with status: 'rejected'
-    setUsers(users.filter(u => u._id !== userId));
-    alert('User verification rejected.');
+  const handleApprove = async (userId) => {
+    try {
+      const response = await adminAPI.approveVerification(userId);
+      if (response.data.success) {
+        setUsers(users.filter(u => u._id !== userId));
+        alert('User verified successfully!');
+      }
+    } catch (error) {
+      console.error('Failed to approve verification:', error);
+      alert('Failed to approve verification');
+    }
+  };
+
+  const handleReject = async (userId) => {
+    const reason = window.prompt('Enter rejection reason:');
+    if (!reason) return;
+    
+    try {
+      const response = await adminAPI.rejectVerification(userId, { reason });
+      if (response.data.success) {
+        setUsers(users.filter(u => u._id !== userId));
+        alert('User verification rejected.');
+      }
+    } catch (error) {
+      console.error('Failed to reject verification:', error);
+      alert('Failed to reject verification');
+    }
   };
 
   const openImageModal = (user) => {
@@ -71,15 +81,33 @@ const AdminVerification = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-8">
+    <div className="flex min-h-screen bg-gray-50 dark:bg-gray-900">
+      <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      <div className="flex-1 w-full lg:w-auto">
+        {/* Mobile Header */}
+        <div className="lg:hidden sticky top-0 z-30 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-4">
+          <div className="flex items-center justify-between">
+            <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100">Verification Requests</h1>
+            <button
+              onClick={() => setSidebarOpen(true)}
+              className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
+            >
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <div className="p-4 sm:p-6 lg:p-8">
       <div className="container-custom max-w-7xl">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
         >
           {/* Header */}
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-2">
+          <div className="mb-6 lg:mb-8 hidden lg:block">
+            <h1 className="text-2xl lg:text-3xl font-bold text-gray-900 dark:text-gray-100 mb-2">
               NID Verification Requests
             </h1>
             <p className="text-gray-600 dark:text-gray-400">
@@ -158,7 +186,16 @@ const AdminVerification = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                  {users.length === 0 ? (
+                  {loading ? (
+                    <tr>
+                      <td colSpan="5" className="px-6 py-12 text-center">
+                        <div className="flex flex-col items-center">
+                          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mb-4"></div>
+                          <p className="text-gray-500 dark:text-gray-400">Loading pending verifications...</p>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : users.length === 0 ? (
                     <tr>
                       <td colSpan="5" className="px-6 py-12 text-center">
                         <div className="flex flex-col items-center">
@@ -180,15 +217,15 @@ const AdminVerification = () => {
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-3">
                             <img
-                              src={user.avatar}
+                              src={user.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name || 'User')}&background=random&size=200`}
                               alt={user.name}
-                              className="w-10 h-10 rounded-full"
+                              className="w-10 h-10 rounded-full object-cover"
                             />
                             <div>
                               <p className="font-medium text-gray-900 dark:text-gray-100 flex items-center gap-1.5">
                                 {user.name}
-                                {user.verificationStatus === 'verified' && (
-                                  <svg className="w-4 h-4 text-blue-500" fill="currentColor" viewBox="0 0 20 20" title="Verified">
+                                {(user.verificationStatus === 'verified' || user.nidVerified) && (
+                                  <svg className="w-4 h-4 text-blue-500" fill="currentColor" viewBox="0 0 20 20" title="Verified with NID">
                                     <path fillRule="evenodd" d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                                   </svg>
                                 )}
@@ -201,7 +238,7 @@ const AdminVerification = () => {
                         </td>
                         <td className="px-6 py-4">
                           <p className="text-sm font-mono text-gray-900 dark:text-gray-100">
-                            {user.nid}
+                            {user.nidNumber || 'N/A'}
                           </p>
                         </td>
                         <td className="px-6 py-4">
@@ -214,7 +251,7 @@ const AdminVerification = () => {
                         </td>
                         <td className="px-6 py-4">
                           <p className="text-sm text-gray-600 dark:text-gray-400">
-                            {formatDate(user.submittedAt)}
+                            {formatDate(user.updatedAt || user.createdAt)}
                           </p>
                         </td>
                         <td className="px-6 py-4">
@@ -261,14 +298,19 @@ const AdminVerification = () => {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <p className="text-sm text-gray-500 dark:text-gray-400">Name</p>
-                <p className="font-medium text-gray-900 dark:text-gray-100">
+                <p className="font-medium text-gray-900 dark:text-gray-100 flex items-center gap-1.5">
                   {selectedUser?.name}
+                  {(selectedUser?.verificationStatus === 'verified' || selectedUser?.nidVerified) && (
+                    <svg className="w-5 h-5 text-blue-500" fill="currentColor" viewBox="0 0 20 20" title="Verified with NID">
+                      <path fillRule="evenodd" d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                    </svg>
+                  )}
                 </p>
               </div>
               <div>
                 <p className="text-sm text-gray-500 dark:text-gray-400">NID Number</p>
                 <p className="font-mono text-gray-900 dark:text-gray-100">
-                  {selectedUser?.nid}
+                  {selectedUser?.nidNumber || 'N/A'}
                 </p>
               </div>
               <div>
@@ -278,7 +320,7 @@ const AdminVerification = () => {
               <div>
                 <p className="text-sm text-gray-500 dark:text-gray-400">Submitted</p>
                 <p className="text-gray-900 dark:text-gray-100">
-                  {selectedUser && formatDate(selectedUser.submittedAt)}
+                  {selectedUser && formatDate(selectedUser.updatedAt || selectedUser.createdAt)}
                 </p>
               </div>
             </div>
@@ -306,6 +348,8 @@ const AdminVerification = () => {
             </div>
           </div>
         </Modal>
+      </div>
+      </div>
       </div>
     </div>
   );

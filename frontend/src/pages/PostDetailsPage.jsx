@@ -1,15 +1,61 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { dummyPosts } from '../utils/dummyData';
 import Button from '../components/Button';
 import PostCard from '../components/PostCard';
+import { postsAPI } from '../services/api';
 
 const PostDetailsPage = () => {
   const { id } = useParams();
-  const post = dummyPosts.find(p => p._id === id) || dummyPosts[0];
-  const relatedPosts = dummyPosts.filter(p => p.category === post.category && p._id !== post._id).slice(0, 3);
+  const [post, setPost] = useState(null);
+  const [relatedPosts, setRelatedPosts] = useState([]);
   const [selectedImage, setSelectedImage] = useState(0);
+  const [loading, setLoading] = useState(true);
+  
+  useEffect(() => {
+    const fetchPost = async () => {
+      try {
+        setLoading(true);
+        const response = await postsAPI.getPost(id);
+        if (response.data.success) {
+          const postData = response.data.data;
+          setPost(postData);
+          
+          // Fetch related posts
+          const relatedResponse = await postsAPI.getPosts({ category: postData.category, limit: 3 });
+          if (relatedResponse.data.success) {
+            setRelatedPosts(relatedResponse.data.data.filter(p => p._id !== id));
+          }
+        }
+      } catch (error) {
+        console.error('Failed to fetch post:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (id) {
+      fetchPost();
+    }
+  }, [id]);
+  
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-8 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+      </div>
+    );
+  }
+
+  if (!post) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-8 flex items-center justify-center">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Post not found</h2>
+        </div>
+      </div>
+    );
+  }
   
   const postImages = Array.isArray(post.images) ? post.images : [post.image];
 
@@ -148,14 +194,14 @@ const PostDetailsPage = () => {
               </h3>
               <div className="flex items-center gap-3 mb-4">
                 <img
-                  src={post.author.avatar}
+                  src={post.author.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(post.author.name || 'User')}&background=random&size=200`}
                   alt={post.author.name}
-                  className="w-16 h-16 rounded-full"
+                  className="w-16 h-16 rounded-full object-cover"
                 />
                 <div>
                   <h4 className="font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-1.5">
                     {post.author.name}
-                    {post.author.verificationStatus === 'verified' && (
+                    {(post.author.verificationStatus === 'verified' || post.author.nidVerified) && (
                       <svg className="w-5 h-5 text-blue-500" fill="currentColor" viewBox="0 0 20 20" title="Verified with NID">
                         <path fillRule="evenodd" d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                       </svg>

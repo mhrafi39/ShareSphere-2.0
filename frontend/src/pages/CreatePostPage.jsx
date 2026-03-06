@@ -1,12 +1,15 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useFormik } from 'formik';
 import * as Yup from 'yup';
 import { motion } from 'framer-motion';
 import Input from '../components/Input';
 import Button from '../components/Button';
 import { categories } from '../utils/dummyData';
+import { postsAPI } from '../services/api';
 
 const CreatePostPage = () => {
+  const navigate = useNavigate();
   const [imagePreviews, setImagePreviews] = useState([]);
   const [loading, setLoading] = useState(false);
 
@@ -29,13 +32,34 @@ const CreatePostPage = () => {
       location: Yup.string().required('Location is required'),
     }),
     onSubmit: async (values) => {
-      setLoading(true);
-      // Simulate API call
-      setTimeout(() => {
-        console.log('Post created:', values);
+      try {
+        setLoading(true);
+        
+        // Create FormData for file upload
+        const formData = new FormData();
+        formData.append('title', values.title);
+        formData.append('description', values.description);
+        formData.append('category', values.category);
+        formData.append('location', values.location);
+        
+        // Append all images
+        values.images.forEach((image) => {
+          formData.append('images', image);
+        });
+        
+        const response = await postsAPI.createPost(formData);
+        
+        if (response.data.success) {
+          alert('Post created successfully!');
+          // Navigate to home page or profile page
+          navigate('/home');
+        }
+      } catch (error) {
+        console.error('Post creation error:', error);
+        alert(error.response?.data?.message || 'Failed to create post');
+      } finally {
         setLoading(false);
-        alert('Post created successfully!');
-      }, 1500);
+      }
     },
   });
 

@@ -47,7 +47,7 @@ const Toast = ({ message, type = 'info', isOpen, onClose, duration = 5000 }) => 
           initial={{ opacity: 0, y: -50, x: '-50%' }}
           animate={{ opacity: 1, y: 0, x: '-50%' }}
           exit={{ opacity: 0, y: -50, x: '-50%' }}
-          className="fixed top-4 left-1/2 z-50 max-w-md w-full px-4"
+          className="fixed top-4 left-1/2 z-[9999] max-w-md w-full px-4"
         >
           <div className={`${style.bg} ${style.text} border-l-4 ${style.border} rounded-lg shadow-soft-lg p-4 flex items-start gap-3`}>
             <span className="text-2xl flex-shrink-0">{style.icon}</span>

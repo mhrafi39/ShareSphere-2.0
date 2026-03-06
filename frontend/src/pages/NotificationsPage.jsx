@@ -1,15 +1,47 @@
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { dummyNotifications } from '../utils/dummyData';
 import NotificationItem from '../components/NotificationItem';
 import Button from '../components/Button';
+import { notificationsAPI } from '../services/api';
 
 const NotificationsPage = () => {
-  const handleMarkAllRead = () => {
-    console.log('Mark all as read');
+  const [notifications, setNotifications] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchNotifications();
+  }, []);
+
+  const fetchNotifications = async () => {
+    try {
+      setLoading(true);
+      const response = await notificationsAPI.getNotifications();
+      if (response.data.success) {
+        setNotifications(response.data.data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch notifications:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleClearAll = () => {
-    console.log('Clear all notifications');
+  const handleMarkAllRead = async () => {
+    try {
+      await notificationsAPI.markAllAsRead();
+      fetchNotifications();
+    } catch (error) {
+      console.error('Failed to mark all as read:', error);
+    }
+  };
+
+  const handleClearAll = async () => {
+    try {
+      await notificationsAPI.clearAll();
+      setNotifications([]);
+    } catch (error) {
+      console.error('Failed to clear notifications:', error);
+    }
   };
 
   return (
@@ -37,9 +69,13 @@ const NotificationsPage = () => {
 
         {/* Notifications List */}
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-soft overflow-hidden">
-          {dummyNotifications.length > 0 ? (
+          {loading ? (
+            <div className="p-12 text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto"></div>
+            </div>
+          ) : notifications.length > 0 ? (
             <div className="divide-y divide-gray-200 dark:divide-gray-700">
-              {dummyNotifications.map((notification) => (
+              {notifications.map((notification) => (
                 <NotificationItem
                   key={notification._id}
                   notification={notification}

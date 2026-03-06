@@ -1,17 +1,35 @@
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { useDispatch } from 'react-redux';
 import { motion } from 'framer-motion';
 import Button from '../components/Button';
+import Toast from '../components/Toast';
+import { authAPI } from '../services/api';
+import { setCredentials } from '../features/authSlice';
 
 const VerifyOTPPage = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const dispatch = useDispatch();
+  
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const [loading, setLoading] = useState(false);
   const [timer, setTimer] = useState(60);
   const [canResend, setCanResend] = useState(false);
-  const navigate = useNavigate();
+  const [toast, setToast] = useState({ show: false, message: '', type: '' });
+  const [resending, setResending] = useState(false);
   const inputRefs = useRef([]);
 
+  const registrationData = location.state || {};
+  const { email, name, password } = registrationData;
+
   useEffect(() => {
+    // Redirect if no registration data
+    if (!email || !name || !password) {
+      navigate('/register');
+      return;
+    }
+
     // Focus first input on mount
     inputRefs.current[0]?.focus();
 
@@ -28,7 +46,7 @@ const VerifyOTPPage = () => {
     }, 1000);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [email, name, password, navigate]);
 
   const handleChange = (index, value) => {
     // Only allow numbers
@@ -72,35 +90,88 @@ const VerifyOTPPage = () => {
     const otpValue = otp.join('');
     
     if (otpValue.length !== 6) {
-      alert('Please enter complete OTP');
+      setToast({
+        show: true,
+        message: 'Please enter a valid 6-digit OTP',
+        type: 'error',
+      });
       return;
     }
 
     setLoading(true);
-    // Simulate API call
-    setTimeout(() => {
+    try {
+      const response = await authAPI.verifyOTP({
+        email,
+        otp: otpValue,
+        name,
+        password,
+      });
+
+      if (response.data.success) {
+        const { token, ...user } = response.data.data;
+        localStorage.setItem('token', token);
+        localStorage.setItem('user', JSON.stringify(user));
+        dispatch(setCredentials({ user, token }));
+
+        setToast({
+          show: true,
+          message: 'Account created successfully!',
+          type: 'success',
+        });
+
+        setTimeout(() => {
+          navigate('/');
+        }, 1500);
+      }
+    } catch (error) {
+      setToast({
+        show: true,
+        message: error.response?.data?.message || 'Invalid or expired OTP',
+        type: 'error',
+      });
+    } finally {
       setLoading(false);
-      navigate('/login');
-    }, 1500);
+    }
   };
 
-  const handleResend = () => {
-    setTimer(60);
-    setCanResend(false);
-    setOtp(['', '', '', '', '', '']);
-    inputRefs.current[0]?.focus();
+  const handleResend = async () => {
+    if (!canResend) return;
 
-    // Restart timer
-    const interval = setInterval(() => {
-      setTimer((prev) => {
-        if (prev <= 1) {
-          setCanResend(true);
-          clearInterval(interval);
-          return 0;
-        }
-        return prev - 1;
+    setResending(true);
+    try {
+      const response = await authAPI.resendOTP({ email, name });
+      if (response.data.success) {
+        setToast({
+          show: true,
+          message: 'OTP resent successfully!',
+          type: 'success',
+        });
+        setTimer(60);
+        setCanResend(false);
+        setOtp(['', '', '', '', '', '']);
+        inputRefs.current[0]?.focus();
+
+        // Restart timer
+        const interval = setInterval(() => {
+          setTimer((prev) => {
+            if (prev <= 1) {
+              setCanResend(true);
+              clearInterval(interval);
+              return 0;
+            }
+            return prev - 1;
+          });
+        }, 1000);
+      }
+    } catch (error) {
+      setToast({
+        show: true,
+        message: error.response?.data?.message || 'Failed to resend OTP',
+        type: 'error',
       });
-    }, 1000);
+    } finally {
+      setResending(false);
+    }
   };
 
   return (
@@ -125,7 +196,7 @@ const VerifyOTPPage = () => {
               We've sent a 6-digit code to your email
             </p>
             <p className="text-primary-600 dark:text-primary-400 font-medium mt-1">
-              john@example.com
+              {email}
             </p>
           </div>
 
@@ -154,9 +225,10 @@ const VerifyOTPPage = () => {
                 <button
                   type="button"
                   onClick={handleResend}
-                  className="text-primary-600 dark:text-primary-400 font-medium hover:underline"
+                  disabled={resending}
+                  className="text-primary-600 dark:text-primary-400 font-medium hover:underline disabled:opacity-50"
                 >
-                  Resend OTP
+                  {resending ? 'Resending...' : 'Resend OTP'}
                 </button>
               ) : (
                 <p className="text-gray-600 dark:text-gray-400">
@@ -184,13 +256,29 @@ const VerifyOTPPage = () => {
           <div className="mt-6 text-center">
             <p className="text-sm text-gray-600 dark:text-gray-400">
               Didn't receive the code?{' '}
-              <button className="text-primary-600 dark:text-primary-400 hover:underline">
-                Check spam folder
-              </button>
+              <span className="text-primary-600 dark:text-primary-400">
+                Check your spam folder
+              </span>
             </p>
+            <button
+              type="button"
+              onClick={() => navigate('/register')}
+              className="mt-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
+            >
+              ← Back to Registration
+            </button>
           </div>
         </div>
       </motion.div>
+
+      {/* Toast Notification */}
+      {toast.show && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast({ show: false, message: '', type: '' })}
+        />
+      )}
     </div>
   );
 };

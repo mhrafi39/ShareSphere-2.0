@@ -1,27 +1,9 @@
 import { createSlice } from '@reduxjs/toolkit';
 
-// Simulated logged-in user (John Doe - Admin & Verified)
-const mockUser = {
-  _id: 'u1',
-  name: 'John Doe',
-  email: 'john@example.com',
-  role: 'admin', // Change to 'admin' to access admin pages
-  verified: true,
-  verificationStatus: 'verified',
-  nid: '1234567890',
-  nidImage: 'https://via.placeholder.com/400x250?text=NID+Card',
-  avatar: 'https://i.pravatar.cc/150?img=1',
-  bio: 'Tech enthusiast and sharing economy advocate',
-  location: 'Dhaka, Bangladesh',
-  joinedDate: '2023-06-15',
-  postsCount: 12,
-  rating: 4.8,
-};
-
 const initialState = {
-  user: mockUser,
-  token: 'mock-jwt-token-for-testing',
-  isAuthenticated: true,
+  user: null,
+  token: localStorage.getItem('token') || null,
+  isAuthenticated: !!localStorage.getItem('token'),
   loading: false,
   error: null,
 };
@@ -41,6 +23,14 @@ const authSlice = createSlice({
       state.token = action.payload.token;
       localStorage.setItem('token', action.payload.token);
     },
+    setCredentials: (state, action) => {
+      state.loading = false;
+      state.isAuthenticated = true;
+      state.user = action.payload.user;
+      state.token = action.payload.token;
+      localStorage.setItem('token', action.payload.token);
+      localStorage.setItem('user', JSON.stringify(action.payload.user));
+    },
     loginFailure: (state, action) => {
       state.loading = false;
       state.error = action.payload;
@@ -50,9 +40,14 @@ const authSlice = createSlice({
       state.token = null;
       state.isAuthenticated = false;
       localStorage.removeItem('token');
+      localStorage.removeItem('user');
     },
     updateUser: (state, action) => {
       state.user = { ...state.user, ...action.payload };
+      // Also update localStorage if user data exists there
+      if (localStorage.getItem('user')) {
+        localStorage.setItem('user', JSON.stringify(state.user));
+      }
     },
     updateVerificationStatus: (state, action) => {
       if (state.user) {
@@ -64,5 +59,5 @@ const authSlice = createSlice({
   },
 });
 
-export const { loginStart, loginSuccess, loginFailure, logout, updateUser, updateVerificationStatus } = authSlice.actions;
+export const { loginStart, loginSuccess, setCredentials, loginFailure, logout, updateUser, updateVerificationStatus } = authSlice.actions;
 export default authSlice.reducer;

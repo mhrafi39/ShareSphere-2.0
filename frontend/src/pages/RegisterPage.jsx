@@ -1,16 +1,22 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useDispatch } from 'react-redux';
 import { useFormik } from 'formik';
 import * as Yup from 'yup';
 import Input from '../components/Input';
 import Button from '../components/Button';
+import Toast from '../components/Toast';
 import { motion } from 'framer-motion';
+import { authAPI } from '../services/api';
+import { setCredentials } from '../features/authSlice';
 
 const RegisterPage = () => {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [toast, setToast] = useState({ show: false, message: '', type: '' });
   const navigate = useNavigate();
+  const dispatch = useDispatch();
 
   const formik = useFormik({
     initialValues: {
@@ -28,10 +34,6 @@ const RegisterPage = () => {
         .required('Email is required'),
       password: Yup.string()
         .min(6, 'Password must be at least 6 characters')
-        .matches(
-          /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/,
-          'Password must contain uppercase, lowercase, and number'
-        )
         .required('Password is required'),
       confirmPassword: Yup.string()
         .oneOf([Yup.ref('password'), null], 'Passwords must match')
@@ -39,11 +41,47 @@ const RegisterPage = () => {
     }),
     onSubmit: async (values) => {
       setLoading(true);
-      // Simulate API call
-      setTimeout(() => {
+      try {
+        const { confirmPassword, ...registrationData } = values;
+        console.log('Sending registration data:', JSON.stringify(registrationData, null, 2)); // Debug log
+        const response = await authAPI.register(registrationData);
+        
+        if (response.data.success) {
+          // TEMPORARILY: Store token and user data directly (no OTP verification)
+          const { token, user } = response.data.data;
+          localStorage.setItem('token', token);
+          localStorage.setItem('user', JSON.stringify(user));
+          dispatch(setCredentials({ user, token }));
+          
+          setToast({
+            show: true,
+            message: 'Registration successful! Welcome to ShareSphere!',
+            type: 'success',
+          });
+          
+          // Navigate to home page
+          setTimeout(() => {
+            navigate('/');
+          }, 1000);
+        }
+      } catch (error) {
+        console.error('Registration error:', JSON.stringify(error.response?.data, null, 2)); // Debug log
+        console.error('Full error:', error); // Full error details
+        console.error('Error status:', error.response?.status); // Status code
+        console.error('Error message from server:', error.response?.data?.message); // Specific message
+        
+        const errorMessage = error.response?.data?.message || 
+                            error.message || 
+                            'Registration failed. Please try again.';
+        
+        setToast({
+          show: true,
+          message: errorMessage,
+          type: 'error',
+        });
+      } finally {
         setLoading(false);
-        navigate('/verify-otp');
-      }, 1500);
+      }
     },
   });
 
@@ -246,6 +284,15 @@ const RegisterPage = () => {
           </p>
         </div>
       </motion.div>
+
+      {/* Toast Notification */}
+      {toast.show && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast({ show: false, message: '', type: '' })}
+        />
+      )}
     </div>
   );
 };

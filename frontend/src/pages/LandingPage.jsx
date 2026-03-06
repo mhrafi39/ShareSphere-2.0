@@ -1,17 +1,37 @@
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { dummyPosts } from '../utils/dummyData';
 import PostCard from '../components/PostCard';
+import { postsAPI } from '../services/api';
 
 const LandingPage = () => {
+  const [featuredPosts, setFeaturedPosts] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchFeaturedPosts = async () => {
+      try {
+        setLoading(true);
+        const response = await postsAPI.getPosts({ limit: 3 });
+        if (response.data.success) {
+          setFeaturedPosts(response.data.data);
+        }
+      } catch (error) {
+        console.error('Failed to fetch featured posts:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchFeaturedPosts();
+  }, []);
+
   const stats = [
     { label: 'Active Users', value: '10,000+' },
     { label: 'Resources Shared', value: '25,000+' },
     { label: 'Communities', value: '150+' },
     { label: 'Cities Covered', value: '50+' },
   ];
-
-  const featuredPosts = dummyPosts.slice(0, 3);
 
   return (
     <div className="min-h-screen">

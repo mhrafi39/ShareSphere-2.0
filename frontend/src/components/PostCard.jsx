@@ -1,17 +1,67 @@
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useState, useEffect, useRef } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useDispatch, useSelector } from 'react-redux';
 import ShareMenu from './ShareMenu';
+import Modal from './Modal';
+import Button from './Button';
+import Input from './Input';
+import { postsAPI } from '../services/api';
 
-const PostCard = ({ post }) => {
+const PostCard = ({ post, onUpdate }) => {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
   const currentUser = useSelector((state) => state.auth.user);
+  const optionsMenuRef = useRef(null);
   const [liked, setLiked] = useState(false);
   const [saved, setSaved] = useState(false);
   const [showShareMenu, setShowShareMenu] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showOptionsMenu, setShowOptionsMenu] = useState(false);
   const [likes, setLikes] = useState(post.likes || 0);
   const [saves, setSaves] = useState(post.saves || 0);
+  const [localPost, setLocalPost] = useState(post);
+  
+  // Edit form states
+  const [editForm, setEditForm] = useState({
+    title: post.title,
+    description: post.description,
+    category: post.category,
+    location: post.location,
+    status: post.status
+  });
+  const [editLoading, setEditLoading] = useState(false);
+  
+  const isOwner = currentUser && post.author && (currentUser._id === post.author._id || currentUser._id === post.author);
+  
+  // Check if post is already saved by current user
+  useEffect(() => {
+    if (currentUser && post.saves) {
+      const isSaved = Array.isArray(post.saves) 
+        ? post.saves.some(saveId => saveId === currentUser._id || saveId._id === currentUser._id)
+        : false;
+      setSaved(isSaved);
+      setSaves(Array.isArray(post.saves) ? post.saves.length : 0);
+    }
+  }, [post.saves, currentUser]);
+  
+  // Close options menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (optionsMenuRef.current && !optionsMenuRef.current.contains(event.target)) {
+        setShowOptionsMenu(false);
+      }
+    };
+    
+    if (showOptionsMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [showOptionsMenu]);
+
+  // Default profile picture
+  const DEFAULT_PROFILE_PIC = 'https://ui-avatars.com/api/?name=' + 
+    encodeURIComponent(post.author?.name || 'User') + '&background=random&size=200';
 
   const handleLike = () => {
     if (liked) {
@@ -22,13 +72,64 @@ const PostCard = ({ post }) => {
     setLiked(!liked);
   };
 
-  const handleSave = () => {
-    if (saved) {
-      setSaves(saves - 1);
-    } else {
-      setSaves(saves + 1);
+  const handleSave = async () => {
+    if (!currentUser) {
+      // Redirect to login if not authenticated
+      navigate('/login');
+      return;
     }
-    setSaved(!saved);
+    
+    try {
+      const response = await postsAPI.toggleSave(post._id);
+      if (response.data.success) {
+        setSaved(response.data.data.saved);
+        setSaves(response.data.data.saves);
+        if (onUpdate) onUpdate(); // Refresh the list if on saved page
+      }
+    } catch (error) {
+      console.error('Failed to toggle save:', error);
+    }
+  };
+  
+  const handleEditSubmit = async (e) => {
+    e.preventDefault();
+    setEditLoading(true);
+    
+    try {
+      const response = await postsAPI.updatePost(post._id, editForm);
+      if (response.data.success) {
+        setLocalPost({ ...localPost, ...editForm });
+        setShowEditModal(false);
+        if (onUpdate) onUpdate();
+      }
+    } catch (error) {
+      console.error('Failed to update post:', error);
+      alert('Failed to update post. Please try again.');
+    } finally {
+      setEditLoading(false);
+    }
+  };
+  
+  const handleToggleStatus = async () => {
+    try {
+      const newStatus = localPost.status === 'available' ? 'unavailable' : 'available';
+      const response = await postsAPI.updatePost(post._id, { status: newStatus });
+      if (response.data.success) {
+        setLocalPost({ ...localPost, status: newStatus });
+        if (onUpdate) onUpdate();
+      }
+    } catch (error) {
+      console.error('Failed to toggle status:', error);
+    }
+  };
+  
+  const handleMessageAuthor = () => {
+    navigate(`/chat?user=${post.author?._id || post.author}`);
+  };
+  
+  const handleMessageAboutPost = () => {
+    // Navigate to chat with author and pass post context
+    navigate(`/chat?user=${post.author?._id || post.author}&post=${post._id}&title=${encodeURIComponent(post.title)}`);
   };
 
   const getStatusColor = (status) => {
@@ -52,23 +153,21 @@ const PostCard = ({ post }) => {
     >
       {/* Author Info */}
       <div className="p-4 flex items-center justify-between">
-        <Link to={`/profile/${post.author._id}`} className="flex items-center gap-3 hover:opacity-80 transition-opacity">
+        <Link to={`/profile/${post.author?._id || post.author}`} className="flex items-center gap-3 hover:opacity-80 transition-opacity">
           <img
-            src={post.author.avatar}
-            alt={post.author.name}
-            className="w-10 h-10 rounded-full"
+            src={post.author?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(post.author?.name || 'User')}&background=random&size=200`}
+            alt={post.author?.name || 'User'}
+            className="w-10 h-10 rounded-full object-cover"
           />
           <div>
-            <div className="flex items-center gap-2">
-              <h3 className="font-semibold text-gray-900 dark:text-gray-100">
-                {post.author.name}
-              </h3>
-              {post.author.verified && (
-                <svg className="w-4 h-4 text-primary-500" fill="currentColor" viewBox="0 0 20 20">
+            <h3 className="font-semibold text-gray-900 dark:text-gray-100 inline-flex items-center gap-1.5">
+              <span>{post.author?.name || 'Unknown User'}</span>
+              {(post.author?.verificationStatus === 'verified' || post.author?.nidVerified) && (
+                <svg className="w-4 h-4 text-blue-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20" title="Verified with NID">
                   <path fillRule="evenodd" d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                 </svg>
               )}
-            </div>
+            </h3>
             <p className="text-sm text-gray-500 dark:text-gray-400">
               {new Date(post.createdAt).toLocaleDateString('en-US', {
                 year: 'numeric',
@@ -79,25 +178,85 @@ const PostCard = ({ post }) => {
           </div>
         </Link>
         <div className="flex items-center gap-2">
-          <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(post.status)}`}>
-            {post.status.charAt(0).toUpperCase() + post.status.slice(1)}
+          <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(localPost.status)}`}>
+            {localPost.status.charAt(0).toUpperCase() + localPost.status.slice(1)}
           </span>
           <span className="px-3 py-1 bg-primary-100 text-primary-800 dark:bg-primary-900 dark:text-primary-200 rounded-full text-xs font-medium">
             {post.category}
           </span>
+          {/* Options Menu */}
+          {currentUser && (
+            <div className="relative" ref={optionsMenuRef}>
+              <button
+                onClick={() => setShowOptionsMenu(!showOptionsMenu)}
+                className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"
+              >
+                <svg className="w-5 h-5 text-gray-600 dark:text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
+                </svg>
+              </button>
+              {showOptionsMenu && (
+                <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-10">
+                  {isOwner ? (
+                    <>
+                      <button
+                        onClick={() => {
+                          setShowEditModal(true);
+                          setShowOptionsMenu(false);
+                        }}
+                        className="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2 text-gray-700 dark:text-gray-300"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                        </svg>
+                        Edit Post
+                      </button>
+                      <button
+                        onClick={() => {
+                          handleToggleStatus();
+                          setShowOptionsMenu(false);
+                        }}
+                        className="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2 text-gray-700 dark:text-gray-300 border-t border-gray-200 dark:border-gray-700"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                        </svg>
+                        {localPost.status === 'available' ? 'Mark as Unavailable' : 'Mark as Available'}
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      onClick={() => {
+                        handleMessageAuthor();
+                        setShowOptionsMenu(false);
+                      }}
+                      className="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2 text-gray-700 dark:text-gray-300"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                      </svg>
+                      Message about this post
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
       {/* Post Image */}
-      <Link to={`/post/${post._id}`}>
-        <div className="relative overflow-hidden bg-gray-200 dark:bg-gray-700" style={{ paddingBottom: '56.25%' }}>
-          <img
-            src={post.image || post.images?.[0]}
-            alt={post.title}
-            className="absolute inset-0 w-full h-full object-cover hover:scale-105 transition-transform duration-300"
-          />
-        </div>
-      </Link>
+      {(post.image || post.images?.[0]) && (
+        <Link to={`/post/${post._id}`}>
+          <div className="relative overflow-hidden bg-gray-200 dark:bg-gray-700" style={{ paddingBottom: '56.25%' }}>
+            <img
+              src={post.image || post.images?.[0]}
+              alt={post.title}
+              className="absolute inset-0 w-full h-full object-cover hover:scale-105 transition-transform duration-300"
+            />
+          </div>
+        </Link>
+      )}
 
       {/* Post Content */}
       <div className="p-4">
@@ -134,6 +293,21 @@ const PostCard = ({ post }) => {
             </svg>
             <span className="font-medium">{likes}</span>
           </motion.button>
+          
+          {/* Message Button - Only show if not the owner */}
+          {!isOwner && currentUser && (
+            <motion.button
+              whileTap={{ scale: 0.9 }}
+              onClick={handleMessageAboutPost}
+              className="flex items-center gap-2 text-gray-600 dark:text-gray-400 hover:text-green-600 dark:hover:text-green-400 transition-colors"
+              title="Message about this post"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+              </svg>
+              <span className="font-medium">Message</span>
+            </motion.button>
+          )}
 
           <div className="relative">
             <motion.button
@@ -146,13 +320,12 @@ const PostCard = ({ post }) => {
               </svg>
               <span className="font-medium">Share</span>
             </motion.button>
-            {showShareMenu && (
-              <ShareMenu
-                url={`${window.location.origin}/post/${post._id}`}
-                title={post.title}
-                onClose={() => setShowShareMenu(false)}
-              />
-            )}
+            <ShareMenu
+              url={`${window.location.origin}/post/${post._id}`}
+              title={post.title}
+              isOpen={showShareMenu}
+              onClose={() => setShowShareMenu(false)}
+            />
           </div>
         </div>
 
@@ -174,6 +347,101 @@ const PostCard = ({ post }) => {
           </svg>
         </motion.button>
       </div>
+      
+      {/* Edit Post Modal */}
+      <Modal
+        isOpen={showEditModal}
+        onClose={() => setShowEditModal(false)}
+        title="Edit Post"
+      >
+        <form onSubmit={handleEditSubmit} className="space-y-4">
+          <Input
+            label="Title"
+            value={editForm.title}
+            onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
+            required
+            minLength={5}
+          />
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Description
+            </label>
+            <textarea
+              value={editForm.description}
+              onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+              required
+              minLength={20}
+              rows={4}
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary-500 dark:bg-gray-700 dark:text-gray-100"
+            />
+          </div>
+          
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Category
+              </label>
+              <select
+                value={editForm.category}
+                onChange={(e) => setEditForm({ ...editForm, category: e.target.value })}
+                required
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary-500 dark:bg-gray-700 dark:text-gray-100"
+              >
+                <option value="Electronics">Electronics</option>
+                <option value="Books">Books</option>
+                <option value="Clothing">Clothing</option>
+                <option value="Sports">Sports</option>
+                <option value="Gaming">Gaming</option>
+                <option value="Tools">Tools</option>
+                <option value="Furniture">Furniture</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Status
+              </label>
+              <select
+                value={editForm.status}
+                onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
+                required
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary-500 dark:bg-gray-700 dark:text-gray-100"
+              >
+                <option value="available">Available</option>
+                <option value="borrowed">Borrowed</option>
+                <option value="unavailable">Unavailable</option>
+              </select>
+            </div>
+          </div>
+          
+          <Input
+            label="Location"
+            value={editForm.location}
+            onChange={(e) => setEditForm({ ...editForm, location: e.target.value })}
+            required
+          />
+          
+          <div className="flex justify-end gap-3 pt-4">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => setShowEditModal(false)}
+              disabled={editLoading}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              variant="primary"
+              disabled={editLoading}
+            >
+              {editLoading ? 'Updating...' : 'Update Post'}
+            </Button>
+          </div>
+        </form>
+      </Modal>
     </motion.div>
   );
 };

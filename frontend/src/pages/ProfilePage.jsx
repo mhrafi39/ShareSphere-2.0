@@ -1,25 +1,31 @@
 import { useState, useEffect } from 'react';
-import { useParams, useLocation, Link } from 'react-router-dom';
+import { useParams, useLocation, Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useDispatch, useSelector } from 'react-redux';
-import { dummyUser, dummyPosts } from '../utils/dummyData';
 import { updateVerificationStatus } from '../features/authSlice';
 import ProfileCard from '../components/ProfileCard';
 import PostCard from '../components/PostCard';
 import Button from '../components/Button';
 import Modal from '../components/Modal';
 import Input from '../components/Input';
+import { usersAPI, postsAPI, authAPI } from '../services/api';
 
 const ProfilePage = () => {
   const { userId } = useParams();
   const location = useLocation();
+  const navigate = useNavigate();
   const dispatch = useDispatch();
-  const currentUser = useSelector((state) => state.auth.user) || dummyUser;
+  const currentUser = useSelector((state) => state.auth.user);
+  const isAuthenticated = useSelector((state) => state.auth.isAuthenticated);
   
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isVerificationModalOpen, setIsVerificationModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('posts');
   const [showVerificationAlert, setShowVerificationAlert] = useState(false);
+  const [profileUser, setProfileUser] = useState(null);
+  const [userPosts, setUserPosts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [userLoading, setUserLoading] = useState(true);
   
   // NID Verification Form
   const [nidNumber, setNidNumber] = useState('');
@@ -27,13 +33,82 @@ const ProfilePage = () => {
   const [nidPreview, setNidPreview] = useState(null);
   
   // If userId is provided, find that user's data, otherwise use current user
-  const isOwnProfile = !userId || userId === currentUser._id;
-  const profileUser = userId && !isOwnProfile 
-    ? dummyPosts.find(post => post.author._id === userId)?.author || currentUser
-    : currentUser;
+  const isOwnProfile = !userId || userId === currentUser?._id;
+
+  // Wait for current user to load on own profile
+  useEffect(() => {
+    if (isOwnProfile && isAuthenticated) {
+      // Wait for currentUser to be loaded
+      if (currentUser) {
+        setUserLoading(false);
+      }
+    } else {
+      setUserLoading(false);
+    }
+  }, [currentUser, isOwnProfile, isAuthenticated]);
+
+  // Fetch user profile and posts
+  // Fetch profile data
+  const fetchProfileData = async () => {
+    try {
+      setLoading(true);
+      
+      // If viewing own profile
+      if (isOwnProfile) {
+        if (!currentUser) {
+          console.log('Current user not loaded');
+          setLoading(false);
+          return;
+        }
+        setProfileUser(currentUser);
+        
+        // Fetch own posts
+        try {
+          const postsResponse = await postsAPI.getPosts({ author: currentUser._id });
+          if (postsResponse.data.success) {
+            setUserPosts(postsResponse.data.data);
+          }
+        } catch (error) {
+          console.error('Failed to fetch posts:', error);
+          setUserPosts([]);
+        }
+      } else if (userId) {
+        // Fetch other user's profile
+        try {
+          const response = await usersAPI.getUserProfile(userId);
+          if (response.data.success) {
+            setProfileUser(response.data.data.user);
+          }
+        } catch (error) {
+          console.error('Failed to fetch user profile:', error);
+        }
+        
+        // Fetch their posts
+        try {
+          const postsResponse = await postsAPI.getPosts({ author: userId });
+          if (postsResponse.data.success) {
+            setUserPosts(postsResponse.data.data);
+          }
+        } catch (error) {
+          console.error('Failed to fetch posts:', error);
+          setUserPosts([]);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to fetch profile data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
   
-  // Filter user's posts
-  const userPosts = dummyPosts.filter(post => post.author._id === (userId || currentUser._id));
+  useEffect(() => {
+    // Don't fetch if still loading current user
+    if (userLoading) {
+      return;
+    }
+
+    fetchProfileData();
+  }, [userId, currentUser, isOwnProfile, userLoading]);
 
   // Show alert if redirected from create page
   useEffect(() => {
@@ -42,6 +117,37 @@ const ProfilePage = () => {
       setTimeout(() => setShowVerificationAlert(false), 5000);
     }
   }, [location]);
+
+  // Show loading state
+  if (loading || userLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-8 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto mb-4"></div>
+          <p className="text-gray-600 dark:text-gray-400">Loading profile...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error if user not found or not logged in
+  if (!loading && !profileUser) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-8 flex items-center justify-center">
+        <div className="text-center">
+          <svg className="w-16 h-16 text-gray-400 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+          </svg>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">
+            {isOwnProfile ? 'Please log in' : 'User not found'}
+          </h2>
+          <Link to={isOwnProfile ? '/login' : '/home'} className="text-primary-600 hover:underline">
+            {isOwnProfile ? 'Go to login' : 'Go back to home'}
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   const handleNidImageChange = (e) => {
     const file = e.target.files[0];
@@ -73,7 +179,11 @@ const ProfilePage = () => {
   };
 
   const getVerificationBadge = () => {
-    switch (profileUser.verificationStatus) {
+    if (!profileUser) return null;
+    
+    const status = profileUser.verificationStatus || (profileUser.nidVerified ? 'verified' : 'unverified');
+    
+    switch (status) {
       case 'verified':
         return (
           <div className="flex items-center gap-2 px-3 py-1.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-lg">
@@ -134,7 +244,7 @@ const ProfilePage = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Profile Card - Sidebar */}
           <div className="lg:col-span-1 space-y-4">
-            <ProfileCard user={profileUser} />
+            <ProfileCard user={profileUser} postsCount={userPosts.length} />
             
             {/* Verification Badge */}
             {isOwnProfile && (
@@ -144,7 +254,7 @@ const ProfilePage = () => {
                 </h3>
                 {getVerificationBadge()}
                 
-                {currentUser.verificationStatus === 'unverified' && (
+                {currentUser && !currentUser.nidVerified && currentUser.verificationStatus !== 'verified' && currentUser.verificationStatus !== 'pending' && (
                   <Link to="/verify-nid">
                     <Button
                       variant="primary"
@@ -200,13 +310,24 @@ const ProfilePage = () => {
               </div>
             )}
             
-            {isOwnProfile && (
+            {isOwnProfile ? (
               <Button
                 variant="primary"
                 className="w-full"
                 onClick={() => setIsEditModalOpen(true)}
               >
                 Edit Profile
+              </Button>
+            ) : (
+              <Button
+                variant="primary"
+                className="w-full flex items-center justify-center gap-2"
+                onClick={() => navigate(`/chat?user=${profileUser._id}`)}
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                </svg>
+                Send Message
               </Button>
             )}
           </div>
@@ -244,7 +365,7 @@ const ProfilePage = () => {
                   {userPosts.length > 0 ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       {userPosts.map((post) => (
-                        <PostCard key={post._id} post={post} />
+                        <PostCard key={post._id} post={post} onUpdate={fetchProfileData} />
                       ))}
                     </div>
                   ) : (
@@ -301,52 +422,17 @@ const ProfilePage = () => {
         onClose={() => setIsEditModalOpen(false)}
         title="Edit Profile"
       >
-        <form className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium mb-2">Profile Picture</label>
-            <div className="flex items-center gap-4">
-              <img
-                src={dummyUser.avatar}
-                alt="Profile"
-                className="w-20 h-20 rounded-full"
-              />
-              <Button variant="outline" size="sm">
-                Change Photo
-              </Button>
-            </div>
-          </div>
+        <div className="space-y-4">
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            To edit your profile picture and other information, please visit the Settings page.
+          </p>
           
-          <div>
-            <label className="block text-sm font-medium mb-2">Name</label>
-            <input
-              type="text"
-              defaultValue={dummyUser.name}
-              className="w-full px-4 py-2 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-2">Bio</label>
-            <textarea
-              rows={3}
-              defaultValue={dummyUser.bio}
-              className="w-full px-4 py-2 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-2">Location</label>
-            <input
-              type="text"
-              defaultValue={dummyUser.location}
-              className="w-full px-4 py-2 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
-            />
-          </div>
-
           <div className="flex gap-3 pt-4">
-            <Button variant="primary" className="flex-1">
-              Save Changes
-            </Button>
+            <Link to="/settings" className="flex-1">
+              <Button variant="primary" className="w-full">
+                Go to Settings
+              </Button>
+            </Link>
             <Button
               variant="secondary"
               className="flex-1"
@@ -355,7 +441,7 @@ const ProfilePage = () => {
               Cancel
             </Button>
           </div>
-        </form>
+        </div>
       </Modal>
 
       {/* NID Verification Modal */}

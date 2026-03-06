@@ -1,80 +1,43 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import Button from '../components/Button';
 import Input from '../components/Input';
 import Modal from '../components/Modal';
-
-// Dummy users data
-const dummyUsers = [
-  {
-    _id: 'u1',
-    name: 'John Doe',
-    email: 'john@example.com',
-    avatar: 'https://i.pravatar.cc/150?img=1',
-    role: 'user',
-    verificationStatus: 'verified',
-    postsCount: 12,
-    joinedAt: '2024-01-10T10:00:00Z',
-    lastActive: '2024-01-16T14:30:00Z',
-    status: 'active',
-  },
-  {
-    _id: 'u2',
-    name: 'Jane Smith',
-    email: 'jane@example.com',
-    avatar: 'https://i.pravatar.cc/150?img=2',
-    role: 'user',
-    verificationStatus: 'verified',
-    postsCount: 8,
-    joinedAt: '2024-01-12T09:30:00Z',
-    lastActive: '2024-01-16T12:15:00Z',
-    status: 'active',
-  },
-  {
-    _id: 'u3',
-    name: 'Mike Johnson',
-    email: 'mike@example.com',
-    avatar: 'https://i.pravatar.cc/150?img=3',
-    role: 'user',
-    verificationStatus: 'pending',
-    postsCount: 0,
-    joinedAt: '2024-01-15T11:20:00Z',
-    lastActive: '2024-01-16T10:00:00Z',
-    status: 'active',
-  },
-  {
-    _id: 'u4',
-    name: 'Sarah Williams',
-    email: 'sarah@example.com',
-    avatar: 'https://i.pravatar.cc/150?img=4',
-    role: 'user',
-    verificationStatus: 'unverified',
-    postsCount: 0,
-    joinedAt: '2024-01-14T15:45:00Z',
-    lastActive: '2024-01-15T09:20:00Z',
-    status: 'active',
-  },
-  {
-    _id: 'u5',
-    name: 'Tom Brown',
-    email: 'tom@example.com',
-    avatar: 'https://i.pravatar.cc/150?img=5',
-    role: 'user',
-    verificationStatus: 'rejected',
-    postsCount: 0,
-    joinedAt: '2024-01-13T08:10:00Z',
-    lastActive: '2024-01-14T16:30:00Z',
-    status: 'suspended',
-  },
-];
+import Sidebar from '../layouts/Sidebar';
+import { adminAPI } from '../services/api';
 
 const AdminUsersPage = () => {
-  const [users, setUsers] = useState(dummyUsers);
+  const [users, setUsers] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterVerification, setFilterVerification] = useState('all');
   const [selectedUser, setSelectedUser] = useState(null);
   const [isUserModalOpen, setIsUserModalOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  useEffect(() => {
+    fetchUsers();
+  }, [filterStatus, filterVerification, searchQuery]);
+
+  const fetchUsers = async () => {
+    try {
+      setLoading(true);
+      const params = {};
+      if (filterStatus !== 'all') params.status = filterStatus;
+      if (filterVerification !== 'all') params.verificationStatus = filterVerification;
+      if (searchQuery) params.search = searchQuery;
+      
+      const response = await adminAPI.getAllUsers(params);
+      if (response.data.success) {
+        setUsers(response.data.data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch users:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const getVerificationBadge = (status) => {
     const badges = {
@@ -119,25 +82,34 @@ const AdminUsersPage = () => {
     setIsUserModalOpen(true);
   };
 
-  const handleSuspendUser = (userId) => {
-    const confirmSuspend = window.confirm('Are you sure you want to suspend this user?');
-    if (confirmSuspend) {
-      setUsers(users.map(u => u._id === userId ? { ...u, status: 'suspended' } : u));
-      alert('User suspended successfully');
+  const handleToggleRole = async (userId) => {
+    try {
+      const response = await adminAPI.toggleUserRole(userId);
+      if (response.data.success) {
+        // Refresh the user list
+        fetchUsers();
+        alert(response.data.message);
+      }
+    } catch (error) {
+      console.error('Failed to toggle user role:', error);
+      alert('Failed to toggle user role');
     }
   };
 
-  const handleActivateUser = (userId) => {
-    setUsers(users.map(u => u._id === userId ? { ...u, status: 'active' } : u));
-    alert('User activated successfully');
-  };
-
-  const handleDeleteUser = (userId) => {
+  const handleDeleteUser = async (userId) => {
     const confirmDelete = window.confirm('Are you sure you want to delete this user? This action cannot be undone.');
     if (confirmDelete) {
-      setUsers(users.filter(u => u._id !== userId));
-      alert('User deleted successfully');
-      setIsUserModalOpen(false);
+      try {
+        const response = await adminAPI.deleteUser(userId);
+        if (response.data.success) {
+          setUsers(users.filter(u => u._id !== userId));
+          alert('User deleted successfully');
+          setIsUserModalOpen(false);
+        }
+      } catch (error) {
+        console.error('Failed to delete user:', error);
+        alert('Failed to delete user');
+      }
     }
   };
 
@@ -152,15 +124,33 @@ const AdminUsersPage = () => {
   });
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-8">
+    <div className="flex min-h-screen bg-gray-50 dark:bg-gray-900">
+      <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      <div className="flex-1 w-full lg:w-auto">
+        {/* Mobile Header */}
+        <div className="lg:hidden sticky top-0 z-30 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-4">
+          <div className="flex items-center justify-between">
+            <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100">User Management</h1>
+            <button
+              onClick={() => setSidebarOpen(true)}
+              className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
+            >
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <div className="p-4 sm:p-6 lg:p-8">
       <div className="container-custom max-w-7xl">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
         >
           {/* Header */}
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-2">
+          <div className="mb-6 lg:mb-8 hidden lg:block">
+            <h1 className="text-2xl lg:text-3xl font-bold text-gray-900 dark:text-gray-100 mb-2">
               User Management
             </h1>
             <p className="text-gray-600 dark:text-gray-400">
@@ -331,13 +321,18 @@ const AdminUsersPage = () => {
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-3">
                             <img
-                              src={user.avatar}
+                              src={user.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name || 'User')}&background=random&size=200`}
                               alt={user.name}
-                              className="w-10 h-10 rounded-full"
+                              className="w-10 h-10 rounded-full object-cover"
                             />
                             <div>
-                              <p className="font-medium text-gray-900 dark:text-gray-100">
+                              <p className="font-medium text-gray-900 dark:text-gray-100 flex items-center gap-1.5">
                                 {user.name}
+                                {(user.verificationStatus === 'verified' || user.nidVerified) && (
+                                  <svg className="w-4 h-4 text-blue-500" fill="currentColor" viewBox="0 0 20 20" title="Verified with NID">
+                                    <path fillRule="evenodd" d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                  </svg>
+                                )}
                               </p>
                               <p className="text-sm text-gray-500 dark:text-gray-400">
                                 {user.email}
@@ -367,21 +362,12 @@ const AdminUsersPage = () => {
                             >
                               View
                             </button>
-                            {user.status === 'active' ? (
-                              <button
-                                onClick={() => handleSuspendUser(user._id)}
-                                className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 text-sm font-medium"
-                              >
-                                Suspend
-                              </button>
-                            ) : (
-                              <button
-                                onClick={() => handleActivateUser(user._id)}
-                                className="text-green-600 hover:text-green-700 dark:text-green-400 dark:hover:text-green-300 text-sm font-medium"
-                              >
-                                Activate
-                              </button>
-                            )}
+                            <button
+                              onClick={() => handleToggleRole(user._id)}
+                              className="text-purple-600 hover:text-purple-700 dark:text-purple-400 dark:hover:text-purple-300 text-sm font-medium"
+                            >
+                              Toggle Role
+                            </button>
                           </div>
                         </td>
                       </tr>
@@ -403,13 +389,18 @@ const AdminUsersPage = () => {
             <div className="space-y-6">
               <div className="flex items-center gap-4">
                 <img
-                  src={selectedUser.avatar}
+                  src={selectedUser.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(selectedUser.name || 'User')}&background=random&size=200`}
                   alt={selectedUser.name}
-                  className="w-20 h-20 rounded-full"
+                  className="w-20 h-20 rounded-full object-cover"
                 />
                 <div className="flex-1">
-                  <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100">
+                  <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2">
                     {selectedUser.name}
+                    {(selectedUser.verificationStatus === 'verified' || selectedUser.nidVerified) && (
+                      <svg className="w-5 h-5 text-blue-500" fill="currentColor" viewBox="0 0 20 20" title="Verified with NID">
+                        <path fillRule="evenodd" d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                      </svg>
+                    )}
                   </h3>
                   <p className="text-gray-600 dark:text-gray-400">{selectedUser.email}</p>
                   <div className="flex gap-2 mt-2">
@@ -447,29 +438,16 @@ const AdminUsersPage = () => {
               </div>
 
               <div className="flex gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
-                {selectedUser.status === 'active' ? (
-                  <Button
-                    variant="danger"
-                    className="flex-1"
-                    onClick={() => {
-                      handleSuspendUser(selectedUser._id);
-                      setIsUserModalOpen(false);
-                    }}
-                  >
-                    Suspend User
-                  </Button>
-                ) : (
-                  <Button
-                    variant="primary"
-                    className="flex-1"
-                    onClick={() => {
-                      handleActivateUser(selectedUser._id);
-                      setIsUserModalOpen(false);
-                    }}
-                  >
-                    Activate User
-                  </Button>
-                )}
+                <Button
+                  variant="primary"
+                  className="flex-1"
+                  onClick={() => {
+                    handleToggleRole(selectedUser._id);
+                    setIsUserModalOpen(false);
+                  }}
+                >
+                  Toggle Role ({selectedUser.role === 'admin' ? 'Make User' : 'Make Admin'})
+                </Button>
                 <Button
                   variant="danger"
                   className="flex-1"
@@ -481,6 +459,8 @@ const AdminUsersPage = () => {
             </div>
           )}
         </Modal>
+      </div>
+      </div>
       </div>
     </div>
   );

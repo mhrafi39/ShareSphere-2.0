@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useFormik } from 'formik';
 import * as Yup from 'yup';
@@ -7,12 +7,20 @@ import { loginSuccess } from '../features/authSlice';
 import Input from '../components/Input';
 import Button from '../components/Button';
 import { motion } from 'framer-motion';
+import { authAPI } from '../services/api';
 
 const LoginPage = () => {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [showError, setShowError] = useState(false);
   const navigate = useNavigate();
   const dispatch = useDispatch();
+
+  // Debug: Log when error state changes
+  useEffect(() => {
+    console.log('Error state changed:', { showError, errorMessage });
+  }, [showError, errorMessage]);
 
   const formik = useFormik({
     initialValues: {
@@ -29,22 +37,37 @@ const LoginPage = () => {
     }),
     onSubmit: async (values) => {
       setLoading(true);
-      // Simulate API call
-      setTimeout(() => {
-        // Mock login
-        dispatch(loginSuccess({
-          user: {
-            _id: 'u1',
-            name: 'John Doe',
-            email: values.email,
-            verified: true,
-            avatar: 'https://i.pravatar.cc/150?img=1',
-          },
-          token: 'mock-jwt-token',
-        }));
+      setShowError(false); // Hide previous error
+      try {
+        const response = await authAPI.login(values);
+        if (response.data.success) {
+          dispatch(loginSuccess({
+            user: response.data.data,
+            token: response.data.data.token,
+          }));
+          navigate('/home');
+        } else {
+          // Handle case where response is received but success is false
+          const errorMsg = response.data?.message || 'Login failed. Please try again.';
+          console.log('Login failed with message:', errorMsg);
+          setErrorMessage(errorMsg);
+          setShowError(true);
+        }
+      } catch (error) {
+        console.error('Login error caught:', error);
+        console.error('Error response:', error.response);
+        console.error('Error status:', error.response?.status);
+        console.error('Error data:', error.response?.data);
+        
+        const errorMsg = error.response?.data?.message || 
+                        error.message || 
+                        'Login failed. Please check your credentials and try again.';
+        console.log('Setting error message:', errorMsg);
+        setErrorMessage(errorMsg);
+        setShowError(true);
+      } finally {
         setLoading(false);
-        navigate('/home');
-      }, 1500);
+      }
     },
   });
 
@@ -71,6 +94,24 @@ const LoginPage = () => {
 
           {/* Form */}
           <form onSubmit={formik.handleSubmit} className="space-y-6">
+            {/* Inline Error Message */}
+            {showError && errorMessage && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-red-50 dark:bg-red-900/20 border-l-4 border-red-500 rounded-lg p-4"
+              >
+                <div className="flex items-center gap-3">
+                  <svg className="w-5 h-5 text-red-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                  </svg>
+                  <p className="text-sm font-medium text-red-800 dark:text-red-200">
+                    {errorMessage}
+                  </p>
+                </div>
+              </motion.div>
+            )}
+
             <Input
               label="Email Address"
               type="email"

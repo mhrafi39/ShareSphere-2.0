@@ -30,10 +30,19 @@ export const VerifiedRoute = ({ children }) => {
 
 // Protected route wrapper for admin users
 export const AdminRoute = ({ children }) => {
-  const { isAuthenticated, user } = useSelector((state) => state.auth);
+  const { isAuthenticated, user, token } = useSelector((state) => state.auth);
   
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
+  }
+  
+  // Wait for user data to load (if token exists but user is null, still loading)
+  if (token && !user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+      </div>
+    );
   }
   
   if (user?.role !== 'admin') {

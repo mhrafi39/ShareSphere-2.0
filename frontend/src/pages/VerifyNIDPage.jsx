@@ -4,12 +4,13 @@ import { useSelector, useDispatch } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import Button from '../components/Button';
 import Input from '../components/Input';
-import { dummyUser } from '../utils/dummyData';
+import { authAPI } from '../services/api';
+import { updateUser } from '../features/authSlice';
 
 const VerifyNIDPage = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const currentUser = useSelector((state) => state.auth.user) || dummyUser;
+  const currentUser = useSelector((state) => state.auth.user);
   
   const [formData, setFormData] = useState({
     nid: '',
@@ -88,24 +89,37 @@ const VerifyNIDPage = () => {
     setLoading(true);
 
     try {
-      // TODO: Replace with actual API call
-      // const formDataToSend = new FormData();
-      // formDataToSend.append('nid', formData.nid);
-      // formDataToSend.append('nidImage', formData.nidImage);
-      // const response = await fetch('/api/verification/submit', {
-      //   method: 'POST',
-      //   body: formDataToSend,
-      // });
+      console.log('Starting NID submission...');
+      console.log('NID Number:', formData.nid);
+      console.log('NID Image:', formData.nidImage ? 'File present' : 'No file');
+      
+      // Create FormData for NID submission
+      const formDataToSend = new FormData();
+      formDataToSend.append('nidNumber', formData.nid);
+      formDataToSend.append('nidImage', formData.nidImage);
 
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      console.log('FormData created, sending to API...');
+      
+      // Submit to backend
+      const response = await authAPI.submitNIDVerification(formDataToSend);
 
-      // dispatch(updateVerificationStatus('pending'));
-      alert('NID verification submitted successfully! We will review it shortly.');
-      navigate('/profile');
+      console.log('API Response:', response.data);
+      
+      if (response.data.success) {
+        // Update user state in Redux
+        dispatch(updateUser({ 
+          verificationStatus: 'pending',
+          nidNumber: formData.nid 
+        }));
+        
+        alert('NID verification submitted successfully! We will review it shortly.');
+        navigate('/profile');
+      }
     } catch (error) {
       console.error('Submission error:', error);
-      alert('Failed to submit verification. Please try again.');
+      console.error('Error response:', error.response?.data);
+      const errorMessage = error.response?.data?.message || error.message || 'Failed to submit verification';
+      alert('Failed to submit verification. Please try again.\n\nError: ' + errorMessage);
     } finally {
       setLoading(false);
     }
