@@ -2,10 +2,12 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { Provider, useDispatch, useSelector } from 'react-redux';
 import { useEffect, useState } from 'react';
 import { store } from './store/store';
+import { SocketProvider } from './context/SocketContext';
 import MainLayout from './layouts/MainLayout';
 import { ProtectedRoute, AdminRoute, PublicRoute, VerifiedRoute } from './utils/ProtectedRoute';
-import { authAPI } from './services/api';
+import { authAPI, notificationsAPI } from './services/api';
 import { setCredentials, logout } from './features/authSlice';
+import { setNotifications } from './features/notificationSlice';
 
 // Pages
 import LandingPage from './pages/LandingPage';
@@ -42,6 +44,16 @@ function AppRoutes() {
               user: response.data.data,
               token: storedToken,
             }));
+            
+            // Fetch notifications to initialize unread count
+            try {
+              const notifResponse = await notificationsAPI.getNotifications();
+              if (notifResponse.data.success) {
+                dispatch(setNotifications(notifResponse.data.data));
+              }
+            } catch (notifError) {
+              console.error('Failed to fetch notifications:', notifError);
+            }
           }
         } catch (error) {
           console.error('Failed to fetch user:', error);
@@ -102,9 +114,11 @@ function App() {
   return (
     <div className="bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 min-h-screen">
       <Provider store={store}>
-        <Router>
-          <AppRoutes />
-        </Router>
+        <SocketProvider>
+          <Router>
+            <AppRoutes />
+          </Router>
+        </SocketProvider>
       </Provider>
     </div>
   );

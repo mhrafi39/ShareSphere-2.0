@@ -1,23 +1,38 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
+import { useSelector, useDispatch } from 'react-redux';
+import { useNavigate } from 'react-router-dom';
+import { setNotifications, markAsRead, markAllAsRead as markAllReadAction, clearNotifications as clearNotificationsAction } from '../features/notificationSlice';
 import NotificationItem from '../components/NotificationItem';
 import Button from '../components/Button';
 import { notificationsAPI } from '../services/api';
 
 const NotificationsPage = () => {
-  const [notifications, setNotifications] = useState([]);
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
+  const reduxNotifications = useSelector((state) => state.notifications.notifications);
+  const [notifications, setNotificationsLocal] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetchNotifications();
   }, []);
 
+  // Sync with Redux notifications for real-time updates
+  useEffect(() => {
+    if (reduxNotifications && reduxNotifications.length >= 0) {
+      setNotificationsLocal(reduxNotifications);
+    }
+  }, [reduxNotifications]);
+
   const fetchNotifications = async () => {
     try {
       setLoading(true);
       const response = await notificationsAPI.getNotifications();
       if (response.data.success) {
-        setNotifications(response.data.data);
+        // Dispatch to Redux to update unread count
+        dispatch(setNotifications(response.data.data));
+        setNotificationsLocal(response.data.data);
       }
     } catch (error) {
       console.error('Failed to fetch notifications:', error);
@@ -26,9 +41,32 @@ const NotificationsPage = () => {
     }
   };
 
+  const handleNotificationClick = async (notification) => {
+    try {
+      // Mark as read if not already read
+      if (!notification.read) {
+        await notificationsAPI.markAsRead(notification._id);
+        dispatch(markAsRead(notification._id));
+      }
+
+      // Navigate based on notification type
+      if (notification.post) {
+        navigate(`/posts/${notification.post._id || notification.post}`);
+      } else if (notification.sender) {
+        navigate(`/profile/${notification.sender._id || notification.sender}`);
+      } else if (notification.type === 'verification') {
+        navigate('/profile');
+      }
+    } catch (error) {
+      console.error('Failed to handle notification click:', error);
+    }
+  };
+
   const handleMarkAllRead = async () => {
     try {
       await notificationsAPI.markAllAsRead();
+      // Update Redux state
+      dispatch(markAllReadAction());
       fetchNotifications();
     } catch (error) {
       console.error('Failed to mark all as read:', error);
@@ -38,7 +76,9 @@ const NotificationsPage = () => {
   const handleClearAll = async () => {
     try {
       await notificationsAPI.clearAll();
-      setNotifications([]);
+      // Clear Redux state
+      dispatch(clearNotificationsAction());
+      setNotificationsLocal([]);
     } catch (error) {
       console.error('Failed to clear notifications:', error);
     }
@@ -79,7 +119,7 @@ const NotificationsPage = () => {
                 <NotificationItem
                   key={notification._id}
                   notification={notification}
-                  onClick={() => console.log('Notification clicked:', notification._id)}
+                  onClick={() => handleNotificationClick(notification)}
                 />
               ))}
             </div>

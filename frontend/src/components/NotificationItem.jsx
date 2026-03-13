@@ -42,10 +42,10 @@ const NotificationItem = ({ notification, onClick }) => {
       }`}
     >
       {/* Avatar or Icon */}
-      {notification.user?.avatar || notification.user?.name ? (
+      {notification.sender?.avatar || notification.sender?.name ? (
         <img
-          src={notification.user.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(notification.user.name || 'User')}&background=random&size=200`}
-          alt={notification.user.name}
+          src={notification.sender.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(notification.sender.name || 'User')}&background=random&size=200`}
+          alt={notification.sender.name}
           className="w-10 h-10 rounded-full flex-shrink-0 object-cover"
         />
       ) : (

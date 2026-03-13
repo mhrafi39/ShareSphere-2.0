@@ -39,6 +39,16 @@ const postSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
     }],
+    shares: [{
+      user: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+      },
+      sharedAt: {
+        type: Date,
+        default: Date.now,
+      },
+    }],
     saves: [{
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',

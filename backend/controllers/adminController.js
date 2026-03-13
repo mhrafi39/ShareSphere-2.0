@@ -1,5 +1,7 @@
 const User = require('../models/User');
 const Post = require('../models/Post');
+const Notification = require('../models/Notification');
+const { emitToUser } = require('../config/socket');
 
 // @desc    Get all users (admin only)
 // @route   GET /api/admin/users
@@ -89,7 +91,21 @@ const approveVerification = async (req, res) => {
     user.nidVerified = true;
     await user.save();
 
-    // TODO: Send notification or email to user
+    // Create notification for user
+    const notification = await Notification.create({
+      recipient: user._id,
+      sender: req.user._id,
+      type: 'verification',
+      message: '🎉 Congratulations! Your NID has been verified. You can now create posts.',
+    });
+    
+    // Emit real-time notification
+    const io = req.app.get('io');
+    if (io) {
+      const populatedNotification = await Notification.findById(notification._id)
+        .populate('sender', 'name avatar');
+      emitToUser(io, user._id, 'new-notification', populatedNotification);
+    }
 
     res.status(200).json({
       success: true,
@@ -125,7 +141,21 @@ const rejectVerification = async (req, res) => {
     user.verificationRejectionReason = reason || 'NID verification failed';
     await user.save();
 
-    // TODO: Send notification or email to user with rejection reason
+    // Create notification for user
+    const notification = await Notification.create({
+      recipient: user._id,
+      sender: req.user._id,
+      type: 'verification',
+      message: `Your NID verification was rejected. Reason: ${user.verificationRejectionReason}`,
+    });
+    
+    // Emit real-time notification
+    const io = req.app.get('io');
+    if (io) {
+      const populatedNotification = await Notification.findById(notification._id)
+        .populate('sender', 'name avatar');
+      emitToUser(io, user._id, 'new-notification', populatedNotification);
+    }
 
     res.status(200).json({
       success: true,

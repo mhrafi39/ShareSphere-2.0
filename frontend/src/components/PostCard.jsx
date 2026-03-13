@@ -18,7 +18,7 @@ const PostCard = ({ post, onUpdate }) => {
   const [showShareMenu, setShowShareMenu] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showOptionsMenu, setShowOptionsMenu] = useState(false);
-  const [likes, setLikes] = useState(post.likes || 0);
+  const [likes, setLikes] = useState(post.likes?.length || 0);
   const [saves, setSaves] = useState(post.saves || 0);
   const [localPost, setLocalPost] = useState(post);
   
@@ -33,6 +33,17 @@ const PostCard = ({ post, onUpdate }) => {
   const [editLoading, setEditLoading] = useState(false);
   
   const isOwner = currentUser && post.author && (currentUser._id === post.author._id || currentUser._id === post.author);
+  
+  // Check if post is already liked by current user
+  useEffect(() => {
+    if (currentUser && post.likes) {
+      const isLiked = Array.isArray(post.likes) 
+        ? post.likes.some(likeId => likeId === currentUser._id || likeId._id === currentUser._id)
+        : false;
+      setLiked(isLiked);
+      setLikes(Array.isArray(post.likes) ? post.likes.length : 0);
+    }
+  }, [post.likes, currentUser]);
   
   // Check if post is already saved by current user
   useEffect(() => {
@@ -63,13 +74,33 @@ const PostCard = ({ post, onUpdate }) => {
   const DEFAULT_PROFILE_PIC = 'https://ui-avatars.com/api/?name=' + 
     encodeURIComponent(post.author?.name || 'User') + '&background=random&size=200';
 
-  const handleLike = () => {
-    if (liked) {
-      setLikes(likes - 1);
-    } else {
-      setLikes(likes + 1);
+  const handleLike = async () => {
+    if (!currentUser) {
+      // Redirect to login if not authenticated
+      navigate('/login');
+      return;
     }
-    setLiked(!liked);
+    
+    try {
+      // Optimistic UI update
+      const newLiked = !liked;
+      const newLikes = newLiked ? likes + 1 : likes - 1;
+      setLiked(newLiked);
+      setLikes(newLikes);
+      
+      // Call API
+      const response = await postsAPI.toggleLike(post._id);
+      if (response.data.success) {
+        // Update with actual values from server
+        setLikes(response.data.data.likes);
+        setLiked(response.data.data.liked);
+      }
+    } catch (error) {
+      console.error('Failed to toggle like:', error);
+      // Revert optimistic update on error
+      setLiked(!liked);
+      setLikes(liked ? likes + 1 : likes - 1);
+    }
   };
 
   const handleSave = async () => {

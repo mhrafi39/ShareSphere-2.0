@@ -2,17 +2,30 @@ const Post = require('../models/Post');
 const User = require('../models/User');
 const Notification = require('../models/Notification');
 const { uploadPostImage, deleteFromCloudinary, extractPublicId } = require('../services/cloudinaryService');
+const { emitToUser, emitToAdmins } = require('../config/socket');
 
 // Helper function to create notification
-const createNotification = async (recipientId, senderId, type, message, postId = null) => {
+const createNotification = async (recipientId, senderId, type, message, postId = null, io = null) => {
   try {
-    await Notification.create({
+    const notification = await Notification.create({
       recipient: recipientId,
       sender: senderId,
       type,
       message,
       post: postId,
     });
+    
+    // Populate notification for real-time emission
+    const populatedNotification = await Notification.findById(notification._id)
+      .populate('sender', 'name avatar')
+      .populate('post', 'title');
+    
+    // Emit socket event for real-time notification
+    if (io) {
+      emitToUser(io, recipientId, 'new-notification', populatedNotification);
+    }
+    
+    return notification;
   } catch (error) {
     console.error('Error creating notification:', error);
   }
@@ -309,12 +322,14 @@ const toggleLike = async (req, res) => {
       
       // Create notification if liking someone else's post
       if (post.author.toString() !== req.user._id.toString()) {
+        const io = req.app.get('io');
         await createNotification(
           post.author,
           req.user._id,
           'like',
           `${req.user.name} liked your post "${post.title}"`,
-          post._id
+          post._id,
+          io
         );
       }
     }
@@ -415,12 +430,14 @@ const createBorrowRequest = async (req, res) => {
     await post.save();
 
     // Create notification
+    const io = req.app.get('io');
     await createNotification(
       post.author,
       req.user._id,
       'request',
       `${req.user.name} requested to borrow your "${post.title}"`,
-      post._id
+      post._id,
+      io
     );
 
     res.status(200).json({
@@ -458,6 +475,67 @@ const getSavedPosts = async (req, res) => {
   }
 };
 
+// @desc    Share/unshare a post
+// @route   POST /api/posts/:id/share
+// @access  Private
+const toggleShare = async (req, res) => {
+  try {
+    const post = await Post.findById(req.params.id);
+
+    if (!post) {
+      return res.status(404).json({
+        success: false,
+        message: 'Post not found',
+      });
+    }
+
+    // Check if user already shared the post
+    const shareIndex = post.shares.findIndex(
+      (share) => share.user.toString() === req.user._id.toString()
+    );
+
+    if (shareIndex > -1) {
+      // Unshare
+      post.shares.splice(shareIndex, 1);
+    } else {
+      // Share
+      post.shares.push({
+        user: req.user._id,
+        sharedAt: new Date(),
+      });
+      
+      // Create notification if sharing someone else's post
+      if (post.author.toString() !== req.user._id.toString()) {
+        const io = req.app.get('io');
+        await createNotification(
+          post.author,
+          req.user._id,
+          'share',
+          `${req.user.name} shared your post "${post.title}"`,
+          post._id,
+          io
+        );
+      }
+    }
+
+    await post.save();
+
+    res.status(200).json({
+      success: true,
+      data: {
+        shares: post.shares.length,
+        isShared: shareIndex === -1,
+      },
+    });
+  } catch (error) {
+    console.error('Toggle share error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
 module.exports = {
   getPosts,
   getPost,
@@ -466,6 +544,7 @@ module.exports = {
   deletePost,
   toggleLike,
   toggleSave,
+  toggleShare,
   createBorrowRequest,
   getSavedPosts,
 };

@@ -1,5 +1,7 @@
 const Message = require('../models/Message');
 const User = require('../models/User');
+const mongoose = require('mongoose');
+const { emitToUser, emitToConversation } = require('../config/socket');
 
 // Helper function to generate conversation ID
 const generateConversationId = (userId1, userId2) => {
@@ -12,12 +14,15 @@ const generateConversationId = (userId1, userId2) => {
 const getConversations = async (req, res) => {
   try {
     const userId = req.user._id;
+    const userObjectId = mongoose.Types.ObjectId.isValid(userId) 
+      ? new mongoose.Types.ObjectId(userId) 
+      : userId;
 
     // Get all unique conversations
     const conversations = await Message.aggregate([
       {
         $match: {
-          $or: [{ sender: userId }, { receiver: userId }],
+          $or: [{ sender: userObjectId }, { receiver: userObjectId }],
         },
       },
       {
@@ -30,7 +35,7 @@ const getConversations = async (req, res) => {
           unreadCount: {
             $sum: {
               $cond: [
-                { $and: [{ $eq: ['$receiver', userId] }, { $eq: ['$read', false] }] },
+                { $and: [{ $eq: ['$receiver', userObjectId] }, { $eq: ['$read', false] }] },
                 1,
                 0,
               ],
@@ -43,27 +48,33 @@ const getConversations = async (req, res) => {
       },
     ]);
 
-    // Populate user details
-    const populatedConversations = await Message.populate(conversations, [
-      { path: 'lastMessage.sender', select: 'name avatar' },
-      { path: 'lastMessage.receiver', select: 'name avatar' },
-    ]);
+    // If no conversations, return empty array
+    if (conversations.length === 0) {
+      return res.status(200).json({
+        success: true,
+        data: [],
+      });
+    }
 
-    // Format response
-    const formattedConversations = populatedConversations.map((conv) => {
-      const otherUser =
-        conv.lastMessage.sender._id.toString() === userId.toString()
-          ? conv.lastMessage.receiver
-          : conv.lastMessage.sender;
+    // Manually populate user details
+    const formattedConversations = await Promise.all(
+      conversations.map(async (conv) => {
+        const sender = await User.findById(conv.lastMessage.sender).select('name avatar');
+        const receiver = await User.findById(conv.lastMessage.receiver).select('name avatar');
+        
+        const otherUser = conv.lastMessage.sender.toString() === userId.toString()
+          ? receiver
+          : sender;
 
-      return {
-        _id: conv._id,
-        user: otherUser,
-        lastMessage: conv.lastMessage.content,
-        timestamp: conv.lastMessage.createdAt,
-        unread: conv.unreadCount,
-      };
-    });
+        return {
+          _id: conv._id,
+          user: otherUser,
+          lastMessage: conv.lastMessage.content,
+          timestamp: conv.lastMessage.createdAt,
+          unread: conv.unreadCount,
+        };
+      })
+    );
 
     res.status(200).json({
       success: true,
@@ -159,7 +170,22 @@ const sendMessage = async (req, res) => {
       .populate('sender', 'name avatar')
       .populate('receiver', 'name avatar');
 
-    // TODO: Emit socket event for real-time messaging
+    // Emit socket events for real-time messaging
+    const io = req.app.get('io');
+    if (io) {
+      // Send to receiver's personal room
+      emitToUser(io, receiverId, 'new-message', populatedMessage);
+      
+      // Send to conversation room (if both users are in the conversation)
+      emitToConversation(io, conversationId, 'message-sent', populatedMessage);
+      
+      // Update conversation list for receiver
+      emitToUser(io, receiverId, 'conversation-updated', {
+        conversationId,
+        lastMessage: content.trim(),
+        timestamp: populatedMessage.createdAt,
+      });
+    }
 
     res.status(201).json({
       success: true,

@@ -81,6 +81,7 @@ export const postsAPI = {
   deletePost: (id) => api.delete(`/posts/${id}`),
   toggleLike: (id) => api.post(`/posts/${id}/like`),
   toggleSave: (id) => api.post(`/posts/${id}/save`),
+  toggleShare: (id) => api.post(`/posts/${id}/share`),
   requestBorrow: (id, data) => api.post(`/posts/${id}/request`, data),
   getSavedPosts: () => api.get('/posts/saved/all'),
 };

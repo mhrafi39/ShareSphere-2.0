@@ -1,8 +1,10 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const OTP = require('../models/OTP');
+const Notification = require('../models/Notification');
 const { generateOTP, sendOTPEmail, sendWelcomeEmail } = require('../services/emailService');
 const { uploadProfilePicture, uploadNIDImage, deleteFromCloudinary, extractPublicId } = require('../services/cloudinaryService');
+const { emitToUser, emitToAdmins } = require('../config/socket');
 
 // Generate JWT Token
 const generateToken = (id) => {
@@ -493,6 +495,42 @@ const submitNIDVerification = async (req, res) => {
       
       await user.save();
       console.log('User updated successfully. Verification status:', user.verificationStatus);
+
+      // Notify user about submission confirmation
+      const userNotification = await Notification.create({
+        recipient: user._id,
+        type: 'verification',
+        message: 'Your NID verification has been submitted successfully. Please wait for admin approval.',
+      });
+      
+      // Notify all admins about new verification request
+      const admins = await User.find({ role: 'admin' });
+      const io = req.app.get('io');
+      
+      for (const admin of admins) {
+        const adminNotification = await Notification.create({
+          recipient: admin._id,
+          sender: user._id,
+          type: 'verification',
+          message: `${user.name} submitted NID for verification`,
+        });
+        
+        // Emit real-time notification to admin
+        if (io) {
+          const populatedNotification = await Notification.findById(adminNotification._id)
+            .populate('sender', 'name avatar');
+          emitToUser(io, admin._id, 'new-notification', populatedNotification);
+        }
+      }
+      
+      // Also broadcast to admin room
+      if (io) {
+        emitToAdmins(io, 'new-verification-request', {
+          userId: user._id,
+          userName: user.name,
+          message: `${user.name} submitted NID for verification`,
+        });
+      }
 
       res.status(200).json({
         success: true,

@@ -1,7 +1,9 @@
 require('dotenv').config();
 const express = require('express');
+const http = require('http');
 const cors = require('cors');
 const connectDB = require('./config/db');
+const { initializeSocket } = require('./config/socket');
 
 // Import routes
 const authRoutes = require('./routes/authRoutes');
@@ -13,6 +15,15 @@ const adminRoutes = require('./routes/adminRoutes');
 
 // Initialize express
 const app = express();
+
+// Create HTTP server
+const server = http.createServer(app);
+
+// Initialize Socket.io
+const io = initializeSocket(server);
+
+// Make io accessible to routes
+app.set('io', io);
 
 // Connect to database
 connectDB();
@@ -80,6 +91,7 @@ app.use((err, req, res, next) => {
 // Start server
 const PORT = process.env.PORT || 5000;
 
-app.listen(PORT, () => {
+server.listen(PORT, () => {
   console.log(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
+  console.log('Socket.io initialized and ready for real-time connections');
 });

@@ -1,5 +1,6 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { useEffect } from 'react';
+import { postsAPI } from '../services/api';
 
 const Toast = ({ message, type = 'info', isOpen, onClose, duration = 5000 }) => {
   useEffect(() => {
@@ -67,6 +68,11 @@ const Toast = ({ message, type = 'info', isOpen, onClose, duration = 5000 }) => 
       )}
     </AnimatePresence>
   );
+};
+
+const handleShare = async (postId) => {
+  const response = await postsAPI.toggleShare(postId);
+  console.log('Shares:', response.data.data.shares);
 };
 
 export default Toast;

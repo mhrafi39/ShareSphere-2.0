@@ -1,6 +1,7 @@
 const User = require('../models/User');
 const Post = require('../models/Post');
 const Notification = require('../models/Notification');
+const { emitToUser } = require('../config/socket');
 
 // @desc    Get user profile
 // @route   GET /api/users/:id
@@ -77,12 +78,21 @@ const toggleFollow = async (req, res) => {
       userToFollow.followers.push(req.user._id);
 
       // Create notification
-      await Notification.create({
+      const notification = await Notification.create({
         recipient: req.params.id,
         sender: req.user._id,
         type: 'follow',
         message: `${req.user.name} started following you`,
       });
+      
+      // Populate and emit real-time notification
+      const populatedNotification = await Notification.findById(notification._id)
+        .populate('sender', 'name avatar');
+      
+      const io = req.app.get('io');
+      if (io) {
+        emitToUser(io, req.params.id, 'new-notification', populatedNotification);
+      }
     }
 
     await currentUser.save();

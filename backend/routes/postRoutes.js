@@ -8,6 +8,7 @@ const {
   deletePost,
   toggleLike,
   toggleSave,
+  toggleShare,
   createBorrowRequest,
   getSavedPosts,
 } = require('../controllers/postController');
@@ -24,6 +25,7 @@ router.put('/:id', protect, uploadPost.array('images', 5), updatePost);
 router.delete('/:id', protect, deletePost);
 router.post('/:id/like', protect, toggleLike);
 router.post('/:id/save', protect, toggleSave);
+router.post('/:id/share', protect, toggleShare);
 router.post('/:id/request', protect, createBorrowRequest);
 router.get('/saved/all', protect, getSavedPosts);
 
