@@ -1,11 +1,10 @@
 const nodemailer = require('nodemailer');
 
-// Create transporter
+// Create Gmail SMTP transporter
+// Requires a Gmail App Password (not your regular Gmail password)
 const createTransporter = () => {
   return nodemailer.createTransport({
-    host: process.env.EMAIL_HOST,
-    port: process.env.EMAIL_PORT,
-    secure: false, // true for 465, false for other ports
+    service: 'gmail',
     auth: {
       user: process.env.EMAIL_USER,
       pass: process.env.EMAIL_PASSWORD,
@@ -24,7 +23,7 @@ const sendOTPEmail = async (email, otp, name = 'User') => {
     const transporter = createTransporter();
 
     const mailOptions = {
-      from: process.env.EMAIL_FROM,
+      from: `ShareSphere <${process.env.EMAIL_USER}>`,
       to: email,
       subject: 'ShareSphere - Email Verification OTP',
       html: `
@@ -87,7 +86,7 @@ const sendOTPEmail = async (email, otp, name = 'User') => {
               <p>If you didn't request this verification, please ignore this email.</p>
               
               <div class="footer">
-                <p>© 2026 ShareSphere. All rights reserved.</p>
+                <p>&copy; 2026 ShareSphere. All rights reserved.</p>
               </div>
             </div>
           </div>
@@ -97,6 +96,7 @@ const sendOTPEmail = async (email, otp, name = 'User') => {
     };
 
     await transporter.sendMail(mailOptions);
+    console.log('OTP email sent successfully to:', email);
     return { success: true };
   } catch (error) {
     console.error('Email sending error:', error);
@@ -110,7 +110,7 @@ const sendWelcomeEmail = async (email, name) => {
     const transporter = createTransporter();
 
     const mailOptions = {
-      from: process.env.EMAIL_FROM,
+      from: `ShareSphere <${process.env.EMAIL_USER}>`,
       to: email,
       subject: 'Welcome to ShareSphere!',
       html: `
@@ -157,6 +157,7 @@ const sendWelcomeEmail = async (email, name) => {
     };
 
     await transporter.sendMail(mailOptions);
+    console.log('Welcome email sent successfully to:', email);
     return { success: true };
   } catch (error) {
     console.error('Welcome email error:', error);

@@ -13,17 +13,15 @@ const generateToken = (id) => {
   });
 };
 
-// @desc    Register a new user (TEMPORARILY WITHOUT EMAIL - Direct Registration)
+// @desc    Register a new user (sends OTP for email verification)
 // @route   POST /api/auth/register
 // @access  Public
 const register = async (req, res) => {
   try {
-    console.log('Registration request received:', req.body); // Debug log
     const { name, email, password } = req.body;
 
     // Validate input
     if (!name || !email || !password) {
-      console.log('Validation failed: Missing fields'); // Debug log
       return res.status(400).json({
         success: false,
         message: 'Please provide all required fields',
@@ -32,7 +30,6 @@ const register = async (req, res) => {
 
     // Validate password length
     if (password.length < 6) {
-      console.log('Validation failed: Password too short'); // Debug log
       return res.status(400).json({
         success: false,
         message: 'Password must be at least 6 characters',
@@ -43,51 +40,42 @@ const register = async (req, res) => {
     const userExists = await User.findOne({ email });
 
     if (userExists) {
-      console.log('Validation failed: User already exists'); // Debug log
       return res.status(400).json({
         success: false,
         message: 'User already exists with this email',
       });
     }
 
-    // TEMPORARILY: Create user directly without OTP verification
-    const user = await User.create({
-      name,
+    // Generate OTP
+    const otp = generateOTP();
+
+    // Delete any old OTPs for this email
+    await OTP.deleteMany({ email });
+
+    // Save new OTP to database
+    await OTP.create({
       email,
-      password,
-      isVerified: true, // Set to true temporarily
+      otp,
     });
 
-    console.log('User created successfully:', user._id); // Debug log
+    // Send OTP email
+    const emailResult = await sendOTPEmail(email, otp, name);
 
-    // Generate token
-    const token = generateToken(user._id);
+    if (!emailResult.success) {
+      console.error('Failed to send OTP email:', emailResult.error);
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to send verification email. Please try again.',
+      });
+    }
 
-    console.log('Token generated, sending response'); // Debug log
-
-    // Send response with token and user data
-    res.status(201).json({
+    // Return success - do NOT create user yet (user is created after OTP verification)
+    res.status(200).json({
       success: true,
-      message: 'Registration successful!',
-      data: {
-        token,
-        user: {
-          _id: user._id,
-          name: user.name,
-          email: user.email,
-          avatar: user.avatar,
-          bio: user.bio,
-          role: user.role,
-          isVerified: user.isVerified,
-          nidVerified: user.nidVerified,
-          nidNumber: user.nidNumber,
-          verificationStatus: user.verificationStatus,
-        },
-      },
+      message: 'OTP sent to your email. Please verify to complete registration.',
     });
   } catch (error) {
     console.error('Registration error:', error);
-    console.error('Error stack:', error.stack); // More detailed error
     res.status(500).json({
       success: false,
       message: error.message,

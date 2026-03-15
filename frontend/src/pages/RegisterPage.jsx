@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useDispatch } from 'react-redux';
 import { useFormik } from 'formik';
 import * as Yup from 'yup';
 import Input from '../components/Input';
@@ -8,7 +7,6 @@ import Button from '../components/Button';
 import Toast from '../components/Toast';
 import { motion } from 'framer-motion';
 import { authAPI } from '../services/api';
-import { setCredentials } from '../features/authSlice';
 
 const RegisterPage = () => {
   const [loading, setLoading] = useState(false);
@@ -16,7 +14,6 @@ const RegisterPage = () => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [toast, setToast] = useState({ show: false, message: '', type: '' });
   const navigate = useNavigate();
-  const dispatch = useDispatch();
 
   const formik = useFormik({
     initialValues: {
@@ -43,33 +40,27 @@ const RegisterPage = () => {
       setLoading(true);
       try {
         const { confirmPassword, ...registrationData } = values;
-        console.log('Sending registration data:', JSON.stringify(registrationData, null, 2)); // Debug log
         const response = await authAPI.register(registrationData);
         
         if (response.data.success) {
-          // TEMPORARILY: Store token and user data directly (no OTP verification)
-          const { token, user } = response.data.data;
-          localStorage.setItem('token', token);
-          localStorage.setItem('user', JSON.stringify(user));
-          dispatch(setCredentials({ user, token }));
-          
           setToast({
             show: true,
-            message: 'Registration successful! Welcome to ShareSphere!',
+            message: 'OTP sent to your email! Please verify to complete registration.',
             type: 'success',
           });
           
-          // Navigate to home page
+          // Navigate to OTP verification page with registration data
           setTimeout(() => {
-            navigate('/');
+            navigate('/verify-otp', {
+              state: {
+                email: values.email,
+                name: values.name,
+                password: values.password,
+              },
+            });
           }, 1000);
         }
       } catch (error) {
-        console.error('Registration error:', JSON.stringify(error.response?.data, null, 2)); // Debug log
-        console.error('Full error:', error); // Full error details
-        console.error('Error status:', error.response?.status); // Status code
-        console.error('Error message from server:', error.response?.data?.message); // Specific message
-        
         const errorMessage = error.response?.data?.message || 
                             error.message || 
                             'Registration failed. Please try again.';
