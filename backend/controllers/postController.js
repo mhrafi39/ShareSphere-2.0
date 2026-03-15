@@ -49,7 +49,17 @@ const getPosts = async (req, res) => {
     }
 
     if (search) {
-      query.$text = { $search: search };
+      // Strip non-alphanumeric chars and build a flexible regex
+      // that treats hyphens/spaces as optional separators
+      // e.g. "efootball" or "e-football" both match "E-Football"
+      const cleaned = search.replace(/[^a-zA-Z0-9]/g, '');
+      const flexiblePattern = cleaned.split('').join('[-\\s]*');
+      const searchRegex = { $regex: flexiblePattern, $options: 'i' };
+      query.$or = [
+        { title: searchRegex },
+        { description: searchRegex },
+        { location: searchRegex },
+      ];
     }
 
     if (author) {

@@ -52,10 +52,14 @@ const HomePage = () => {
   }, [selectedCategory, searchQuery]);
 
   // Filter posts based on category and search (client-side fallback)
+  // Normalize strings by removing hyphens/spaces so "efootball" matches "E-Football"
+  const normalize = (str) => str.toLowerCase().replace(/[-\s]/g, '');
   const filteredPosts = posts.filter((post) => {
     const matchesCategory = selectedCategory === 'All' || post.category === selectedCategory;
-    const matchesSearch = post.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         post.description.toLowerCase().includes(searchQuery.toLowerCase());
+    const normalizedSearch = normalize(searchQuery);
+    const matchesSearch = !searchQuery ||
+                         normalize(post.title).includes(normalizedSearch) ||
+                         normalize(post.description).includes(normalizedSearch);
     return matchesCategory && matchesSearch;
   });
 
