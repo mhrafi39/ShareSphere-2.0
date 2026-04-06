@@ -21,10 +21,12 @@ const ProfilePage = () => {
   
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isVerificationModalOpen, setIsVerificationModalOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState('posts');
+  const [activeTab, setActiveTab] = useState(location.state?.activeTab || 'posts');
   const [showVerificationAlert, setShowVerificationAlert] = useState(false);
   const [profileUser, setProfileUser] = useState(null);
   const [userPosts, setUserPosts] = useState([]);
+  const [userReviews, setUserReviews] = useState([]);
+  const [averageRating, setAverageRating] = useState(0);
   const [loading, setLoading] = useState(true);
   const [userLoading, setUserLoading] = useState(true);
   
@@ -32,6 +34,13 @@ const ProfilePage = () => {
   const [nidNumber, setNidNumber] = useState('');
   const [nidImage, setNidImage] = useState(null);
   const [nidPreview, setNidPreview] = useState(null);
+  
+  // Review Form
+  const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewLabel, setReviewLabel] = useState('Excellent');
+  const [reviewComment, setReviewComment] = useState('');
+  const [isSubmittingReview, setIsSubmittingReview] = useState(false);
   
   // If userId is provided, find that user's data, otherwise use current user
   const isOwnProfile = !userId || userId === currentUser?._id;
@@ -54,49 +63,25 @@ const ProfilePage = () => {
     try {
       setLoading(true);
       
-      // If viewing own profile
-      if (isOwnProfile) {
-        if (!currentUser) {
-          console.log('Current user not loaded');
-          setLoading(false);
-          return;
-        }
-        setProfileUser(currentUser);
-        
-        // Fetch own posts
-        try {
-          const postsResponse = await postsAPI.getPosts({ author: currentUser._id });
-          if (postsResponse.data.success) {
-            setUserPosts(postsResponse.data.data);
-          }
-        } catch (error) {
-          console.error('Failed to fetch posts:', error);
-          setUserPosts([]);
-        }
-      } else if (userId) {
-        // Fetch other user's profile
-        try {
-          const response = await usersAPI.getUserProfile(userId);
-          if (response.data.success) {
-            setProfileUser(response.data.data.user);
-          }
-        } catch (error) {
-          console.error('Failed to fetch user profile:', error);
-        }
-        
-        // Fetch their posts
-        try {
-          const postsResponse = await postsAPI.getPosts({ author: userId });
-          if (postsResponse.data.success) {
-            setUserPosts(postsResponse.data.data);
-          }
-        } catch (error) {
-          console.error('Failed to fetch posts:', error);
-          setUserPosts([]);
-        }
+      const targetId = userId || currentUser?._id;
+      if (!targetId) {
+        setLoading(false);
+        return;
+      }
+
+      // Fetch full user profile, including posts and reviews
+      const response = await usersAPI.getUserProfile(targetId);
+      if (response.data.success) {
+        const { user, posts, reviews, averageRating } = response.data.data;
+        setProfileUser(user);
+        setUserPosts(posts || []);
+        setUserReviews(reviews || []);
+        setAverageRating(averageRating || 0);
       }
     } catch (error) {
       console.error('Failed to fetch profile data:', error);
+      setUserPosts([]);
+      setUserReviews([]);
     } finally {
       setLoading(false);
     }
@@ -116,6 +101,11 @@ const ProfilePage = () => {
     if (location.state?.needsVerification) {
       setShowVerificationAlert(true);
       setTimeout(() => setShowVerificationAlert(false), 5000);
+    }
+    
+    // Set active tab if passed in state
+    if (location.state?.activeTab) {
+      setActiveTab(location.state.activeTab);
     }
   }, [location]);
 
@@ -177,6 +167,30 @@ const ProfilePage = () => {
 
     setIsVerificationModalOpen(false);
     alert('NID submitted successfully! Your verification is pending admin approval.');
+  };
+
+  const submitReview = async (e) => {
+    e.preventDefault();
+    if (isOwnProfile) return;
+    setIsSubmittingReview(true);
+    try {
+      const response = await usersAPI.addReview(profileUser._id, {
+        rating: reviewRating,
+        label: reviewLabel,
+        comment: reviewComment,
+      });
+      if (response.data.success) {
+        setIsReviewModalOpen(false);
+        setReviewRating(5);
+        setReviewLabel('Excellent');
+        setReviewComment('');
+        fetchProfileData(); // Refresh reviews
+      }
+    } catch (error) {
+      alert(error.response?.data?.message || 'Error submitting review');
+    } finally {
+      setIsSubmittingReview(false);
+    }
   };
 
   const getVerificationBadge = () => {
@@ -246,7 +260,16 @@ const ProfilePage = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Profile Card - Sidebar */}
           <div className="lg:col-span-1 space-y-4">
-            <ProfileCard user={profileUser} postsCount={userPosts.length} />
+            {profileUser && (
+              <ProfileCard 
+                user={{
+                  ...profileUser,
+                  averageRating,
+                  reviewsCount: userReviews.length
+                }} 
+                postsCount={userPosts.length} 
+              />
+            )}
             
             {/* Verification Badge */}
             {isOwnProfile && (
@@ -337,7 +360,7 @@ const ProfilePage = () => {
           {/* Main Content */}
           <div className="lg:col-span-2 space-y-6">
             {/* Tabs */}
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-soft p-1 flex gap-1">
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-soft p-1 flex gap-1 overflow-x-auto scroolbar-hide">
               <TabButton
                 active={activeTab === 'posts'}
                 onClick={() => setActiveTab('posts')}
@@ -352,6 +375,12 @@ const ProfilePage = () => {
                   Saved (0)
                 </TabButton>
               )}
+              <TabButton
+                active={activeTab === 'reviews'}
+                onClick={() => setActiveTab('reviews')}
+              >
+                Reviews ({userReviews.length})
+              </TabButton>
               <TabButton
                 active={activeTab === 'activity'}
                 onClick={() => setActiveTab('activity')}
@@ -386,6 +415,67 @@ const ProfilePage = () => {
                   title="No saved resources"
                   description="Resources you save will appear here"
                 />
+              )}
+
+              {activeTab === 'reviews' && (
+                <div className="bg-white dark:bg-gray-800 rounded-xl shadow-soft p-6">
+                  <div className="flex justify-between items-center mb-6">
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                        User Reviews
+                      </h3>
+                      {userReviews.length > 0 && (
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className="text-yellow-400">★</span>
+                          <span className="font-semibold text-gray-900 dark:text-white">{averageRating}</span>
+                          <span className="text-gray-500 dark:text-gray-400 text-sm">out of 5</span>
+                        </div>
+                      )}
+                    </div>
+                    {!isOwnProfile && isAuthenticated && (
+                      <Button variant="primary" size="sm" onClick={() => setIsReviewModalOpen(true)}>
+                        Write a Review
+                      </Button>
+                    )}
+                  </div>
+                  
+                  {userReviews.length > 0 ? (
+                    <div className="space-y-4">
+                      {userReviews.map((review) => (
+                        <div key={review._id} className="pb-4 border-b border-gray-200 dark:border-gray-700 last:border-0 last:pb-0">
+                          <div className="flex justify-between items-start">
+                            <div className="flex items-center gap-3">
+                              <img src={review.reviewer?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(review.reviewer?.name || 'U')}&background=random`} alt="Reviewer" className="w-10 h-10 rounded-full" />
+                              <div>
+                                <h4 className="font-medium text-gray-900 dark:text-white text-sm">{review.reviewer?.name}</h4>
+                                <div className="flex items-center text-xs mt-0.5 text-yellow-400">
+                                  {Array.from({ length: 5 }).map((_, i) => (
+                                    <span key={i} className={i < review.rating ? '' : 'text-gray-300 dark:text-gray-600'}>★</span>
+                                  ))}
+                                  <span className="ml-2 text-gray-500 dark:text-gray-400">{review.label}</span>
+                                </div>
+                              </div>
+                            </div>
+                            <span className="text-xs text-gray-500 dark:text-gray-400">
+                              {new Date(review.createdAt).toLocaleDateString()}
+                            </span>
+                          </div>
+                          {review.comment && (
+                            <p className="mt-3 text-sm text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900 p-3 rounded-lg">
+                              {review.comment}
+                            </p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <EmptyState
+                      icon="⭐"
+                      title="No reviews yet"
+                      description={isOwnProfile ? "You don't have any reviews." : "Be the first to review this person!"}
+                    />
+                  )}
+                </div>
               )}
 
               {activeTab === 'activity' && (
@@ -553,6 +643,72 @@ const ProfilePage = () => {
             </Button>
           </div>
         </div>
+      </Modal>
+
+      {/* Write Review Modal */}
+      <Modal
+        isOpen={isReviewModalOpen}
+        onClose={() => setIsReviewModalOpen(false)}
+        title={`Review ${profileUser?.name}`}
+      >
+        <form onSubmit={submitReview} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Rating
+            </label>
+            <div className="flex gap-2 text-2xl">
+              {[1, 2, 3, 4, 5].map((star) => (
+                <button
+                  type="button"
+                  key={star}
+                  onClick={() => {
+                    setReviewRating(star);
+                    const labels = ['Very Bad', 'Bad', 'Average', 'Good', 'Excellent'];
+                    setReviewLabel(labels[star - 1]);
+                  }}
+                  className={`focus:outline-none transition-colors ${star <= reviewRating ? 'text-yellow-400' : 'text-gray-300 dark:text-gray-600 hover:text-yellow-200'}`}
+                >
+                  ★
+                </button>
+              ))}
+            </div>
+            <p className="text-sm font-medium text-primary-600 mt-1">{reviewLabel}</p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Comment (Optional)
+            </label>
+            <textarea
+              value={reviewComment}
+              onChange={(e) => setReviewComment(e.target.value)}
+              rows="4"
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-primary-500 transition-all resize-none"
+              placeholder="Describe your experience with this person..."
+              maxLength={500}
+            />
+            <p className="text-xs text-gray-500 text-right mt-1">{reviewComment.length}/500</p>
+          </div>
+
+          <div className="flex gap-3 pt-4">
+            <Button
+              variant="secondary"
+              type="button"
+              className="flex-1"
+              onClick={() => setIsReviewModalOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              type="submit"
+              className="flex-1"
+              disabled={isSubmittingReview}
+            >
+              {isSubmittingReview ? 'Submitting...' : 'Submit Review'}
+            </Button>
+          </div>
+        </form>
       </Modal>
     </div>
   );

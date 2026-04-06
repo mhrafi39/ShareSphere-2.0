@@ -1,6 +1,7 @@
 const User = require('../models/User');
 const Post = require('../models/Post');
 const Notification = require('../models/Notification');
+const Report = require('../models/Report');
 const { emitToUser } = require('../config/socket');
 
 // @desc    Get all users (admin only)
@@ -349,6 +350,147 @@ const getRecentPosts = async (req, res) => {
   }
 };
 
+// @desc    Get all reports
+// @route   GET /api/admin/reports
+// @access  Private/Admin
+const getReports = async (req, res) => {
+  try {
+    const { status = 'pending' } = req.query;
+    const query = status === 'all' ? {} : { status };
+
+    const reports = await Report.find(query)
+      .populate('post')
+      .populate('reportedBy', 'name email avatar')
+      .populate({
+        path: 'post',
+        populate: {
+          path: 'author',
+          select: 'name email avatar isBanned'
+        }
+      })
+      .sort({ createdAt: -1 });
+
+    res.status(200).json({
+      success: true,
+      data: reports,
+    });
+  } catch (error) {
+    console.error('Get reports error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+// @desc    Resolve report
+// @route   PATCH /api/admin/reports/:reportId/resolve
+// @access  Private/Admin
+const resolveReport = async (req, res) => {
+  try {
+    const { status } = req.body; // 'resolved' or 'dismissed'
+    
+    const report = await Report.findById(req.params.reportId);
+    if (!report) {
+      return res.status(404).json({
+        success: false,
+        message: 'Report not found',
+      });
+    }
+
+    report.status = status || 'resolved';
+    await report.save();
+
+    res.status(200).json({
+      success: true,
+      message: `Report marked as ${report.status}`,
+      data: report,
+    });
+  } catch (error) {
+    console.error('Resolve report error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+// @desc    Delete post by admin
+// @route   DELETE /api/admin/posts/:postId
+// @access  Private/Admin
+const deletePostByAdmin = async (req, res) => {
+  try {
+    const post = await Post.findById(req.params.postId);
+    if (!post) {
+      return res.status(404).json({
+        success: false,
+        message: 'Post not found',
+      });
+    }
+
+    // Mark all reports for this post as resolved
+    await Report.updateMany({ post: post._id }, { status: 'resolved' });
+
+    // Optionally notify the author
+    await Notification.create({
+      recipient: post.author,
+      sender: req.user._id,
+      type: 'system',
+      message: `Your post "${post.title}" was removed by an admin for violating community guidelines.`,
+    });
+
+    await post.deleteOne();
+
+    res.status(200).json({
+      success: true,
+      message: 'Post removed by admin and reports resolved',
+    });
+  } catch (error) {
+    console.error('Admin delete post error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+// @desc    Toggle user ban status
+// @route   PATCH /api/admin/users/:userId/ban
+// @access  Private/Admin
+const toggleUserBan = async (req, res) => {
+  try {
+    const user = await User.findById(req.params.userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found',
+      });
+    }
+
+    if (user.role === 'admin') {
+      return res.status(400).json({
+        success: false,
+        message: 'Cannot ban another admin',
+      });
+    }
+
+    user.isBanned = !user.isBanned;
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: `User ${user.isBanned ? 'banned' : 'unbanned'} successfully`,
+      data: { isBanned: user.isBanned },
+    });
+  } catch (error) {
+    console.error('Toggle ban error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
 module.exports = {
   getAllUsers,
   getPendingVerifications,
@@ -359,4 +501,8 @@ module.exports = {
   getDashboardStats,
   getRecentUsers,
   getRecentPosts,
+  getReports,
+  resolveReport,
+  deletePostByAdmin,
+  toggleUserBan,
 };

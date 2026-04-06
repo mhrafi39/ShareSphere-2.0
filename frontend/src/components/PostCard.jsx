@@ -199,13 +199,21 @@ const PostCard = ({ post, onUpdate }) => {
                 </svg>
               )}
             </h3>
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              {new Date(post.createdAt).toLocaleDateString('en-US', {
-                year: 'numeric',
-                month: 'short',
-                day: 'numeric'
-              })}
-            </p>
+            <div className="flex items-center gap-2">
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                {new Date(post.createdAt).toLocaleDateString('en-US', {
+                  year: 'numeric',
+                  month: 'short',
+                  day: 'numeric'
+                })}
+              </p>
+              {post.author?.averageRating > 0 && (
+                <div className="flex items-center gap-1 text-xs text-yellow-500">
+                  <span>★</span>
+                  <span className="font-medium">{post.author.averageRating}</span>
+                </div>
+              )}
+            </div>
           </div>
         </Link>
         <div className="flex items-center gap-2">
@@ -308,21 +316,21 @@ const PostCard = ({ post, onUpdate }) => {
       </div>
 
       {/* Actions */}
-      <div className="px-4 py-3 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between">
-        <div className="flex items-center gap-4">
+      <div className="px-4 py-3 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between flex-wrap gap-y-3">
+        <div className="flex items-center gap-1 sm:gap-4 flex-wrap">
           <motion.button
             whileTap={{ scale: 0.9 }}
             onClick={handleLike}
-            className="flex items-center gap-2 text-gray-600 dark:text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
+            className="flex items-center gap-1.5 text-gray-600 dark:text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 transition-colors px-2 py-1 rounded-lg"
           >
             <svg
-              className={`w-6 h-6 ${liked ? 'fill-current text-primary-600' : 'fill-none stroke-current'}`}
+              className={`w-5 h-5 sm:w-6 sm:h-6 ${liked ? 'fill-current text-primary-600' : 'fill-none stroke-current'}`}
               viewBox="0 0 24 24"
               strokeWidth="2"
             >
               <path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
             </svg>
-            <span className="font-medium">{likes}</span>
+            <span className="font-medium text-sm sm:text-base">{likes}</span>
           </motion.button>
           
           {/* Message Button - Only show if not the owner */}
@@ -330,13 +338,13 @@ const PostCard = ({ post, onUpdate }) => {
             <motion.button
               whileTap={{ scale: 0.9 }}
               onClick={handleMessageAboutPost}
-              className="flex items-center gap-2 text-gray-600 dark:text-gray-400 hover:text-green-600 dark:hover:text-green-400 transition-colors"
+              className="flex items-center gap-1.5 text-gray-600 dark:text-gray-400 hover:text-green-600 dark:hover:text-green-400 transition-colors px-2 py-1 rounded-lg"
               title="Message about this post"
             >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
               </svg>
-              <span className="font-medium">Message</span>
+              <span className="font-medium text-sm sm:text-base hidden xs:inline">Message</span>
             </motion.button>
           )}
 
@@ -344,12 +352,12 @@ const PostCard = ({ post, onUpdate }) => {
             <motion.button
               whileTap={{ scale: 0.9 }}
               onClick={() => setShowShareMenu(!showShareMenu)}
-              className="flex items-center gap-2 text-gray-600 dark:text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
+              className="flex items-center gap-1.5 text-gray-600 dark:text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 transition-colors px-2 py-1 rounded-lg"
             >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
               </svg>
-              <span className="font-medium">Share</span>
+              <span className="font-medium text-sm sm:text-base hidden xs:inline">Share</span>
             </motion.button>
             <ShareMenu
               url={`${window.location.origin}/post/${post._id}`}
@@ -358,6 +366,18 @@ const PostCard = ({ post, onUpdate }) => {
               onClose={() => setShowShareMenu(false)}
             />
           </div>
+
+          <motion.button
+            whileTap={{ scale: 0.9 }}
+            onClick={() => navigate(`/post/${post._id}`)}
+            className="flex items-center gap-1.5 text-red-500 hover:text-red-600 transition-colors px-2 py-1 rounded-lg"
+            title="Report this post"
+          >
+            <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3.L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+            <span className="font-medium text-sm sm:text-base hidden xs:inline">Report</span>
+          </motion.button>
         </div>
 
         <motion.button

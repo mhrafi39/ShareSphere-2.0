@@ -1,6 +1,8 @@
 const Post = require('../models/Post');
 const User = require('../models/User');
 const Notification = require('../models/Notification');
+const Report = require('../models/Report');
+const Review = require('../models/Review');
 const { uploadPostImage, deleteFromCloudinary, extractPublicId } = require('../services/cloudinaryService');
 const { emitToUser, emitToAdmins } = require('../config/socket');
 
@@ -111,9 +113,23 @@ const getPost = async (req, res) => {
       });
     }
 
+    // Get author's review stats
+    const reviews = await Review.find({ reviewee: post.author._id });
+    const reviewsCount = reviews.length;
+    const averageRating = reviewsCount > 0 
+      ? (reviews.reduce((acc, item) => acc + item.rating, 0) / reviewsCount).toFixed(1)
+      : 0;
+
+    // Convert post to lean object to add virtuals/stats
+    const postObj = post.toObject();
+    if (postObj.author) {
+      postObj.author.averageRating = averageRating;
+      postObj.author.reviewsCount = reviewsCount;
+    }
+
     res.status(200).json({
       success: true,
-      data: post,
+      data: postObj,
     });
   } catch (error) {
     console.error('Get post error:', error);
@@ -546,6 +562,63 @@ const toggleShare = async (req, res) => {
   }
 };
 
+// @desc    Report a post
+// @route   POST /api/posts/:id/report
+// @access  Private
+const reportPost = async (req, res) => {
+  try {
+    const post = await Post.findById(req.params.id);
+
+    if (!post) {
+      return res.status(404).json({
+        success: false,
+        message: 'Post not found',
+      });
+    }
+
+    const { reason, details } = req.body;
+
+    if (!reason) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide a reason for reporting',
+      });
+    }
+
+    // Check if user already reported this post
+    const existingReport = await Report.findOne({
+      post: post._id,
+      reportedBy: req.user._id,
+    });
+
+    if (existingReport) {
+      return res.status(400).json({
+        success: false,
+        message: 'You have already reported this post',
+      });
+    }
+
+    const report = await Report.create({
+      post: post._id,
+      reportedBy: req.user._id,
+      reason,
+      details: details || '',
+    });
+
+    res.status(201).json({
+      success: true,
+      message: 'Post reported successfully',
+      data: report,
+    });
+  } catch (error) {
+    console.error('Report post error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
 module.exports = {
   getPosts,
   getPost,
@@ -557,4 +630,5 @@ module.exports = {
   toggleShare,
   createBorrowRequest,
   getSavedPosts,
+  reportPost,
 };

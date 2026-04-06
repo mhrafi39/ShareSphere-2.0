@@ -6,6 +6,7 @@ const {
   getFollowers,
   getFollowing,
   searchUsers,
+  addReview,
 } = require('../controllers/userController');
 const { protect } = require('../middleware/authMiddleware');
 
@@ -17,5 +18,6 @@ router.get('/:id/following', getFollowing);
 
 // Protected routes
 router.post('/:id/follow', protect, toggleFollow);
+router.post('/:id/review', protect, addReview);
 
 module.exports = router;

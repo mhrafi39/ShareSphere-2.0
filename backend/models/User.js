@@ -80,6 +80,10 @@ const userSchema = new mongoose.Schema(
         ref: 'User',
       },
     ],
+    isBanned: {
+      type: Boolean,
+      default: false,
+    },
   },
   {
     timestamps: true,

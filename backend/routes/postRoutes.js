@@ -11,6 +11,7 @@ const {
   toggleShare,
   createBorrowRequest,
   getSavedPosts,
+  reportPost,
 } = require('../controllers/postController');
 const { protect } = require('../middleware/authMiddleware');
 const { uploadPost } = require('../config/cloudinary');
@@ -27,6 +28,7 @@ router.post('/:id/like', protect, toggleLike);
 router.post('/:id/save', protect, toggleSave);
 router.post('/:id/share', protect, toggleShare);
 router.post('/:id/request', protect, createBorrowRequest);
+router.post('/:id/report', protect, reportPost);
 router.get('/saved/all', protect, getSavedPosts);
 
 module.exports = router;

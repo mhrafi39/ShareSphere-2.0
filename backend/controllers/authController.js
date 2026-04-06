@@ -263,6 +263,14 @@ const login = async (req, res) => {
       });
     }
 
+    // Check if user is banned
+    if (user.isBanned) {
+      return res.status(403).json({
+        success: false,
+        message: 'Your account has been banned for violating community guidelines.',
+      });
+    }
+
     // Generate token
     const token = generateToken(user._id);
 

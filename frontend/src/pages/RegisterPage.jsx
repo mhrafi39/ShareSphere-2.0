@@ -62,15 +62,22 @@ const RegisterPage = () => {
           }, 1000);
         }
       } catch (error) {
-        const errorMessage = error.response?.data?.message || 
-                            error.message || 
-                            'Registration failed. Please try again.';
+        const backendMessage = error.response?.data?.message;
+        const errorMessage = backendMessage || error.message || 'Registration failed. Please try again.';
         
-        setToast({
-          show: true,
-          message: errorMessage,
-          type: 'error',
-        });
+        // Minor Bug Fix: Handle email already exists as an inline form error
+        if (backendMessage && backendMessage.toLowerCase().includes('already exists')) {
+          formik.setFieldError('email', backendMessage);
+        } else {
+          // Fall back to toast for other unexpected errors
+          setToast({
+            show: true,
+            message: errorMessage,
+            type: 'error',
+          });
+        }
+        
+
       } finally {
         setLoading(false);
       }

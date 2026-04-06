@@ -1,6 +1,7 @@
 const User = require('../models/User');
 const Post = require('../models/Post');
 const Notification = require('../models/Notification');
+const Review = require('../models/Review');
 const { emitToUser } = require('../config/socket');
 
 // @desc    Get user profile
@@ -22,11 +23,24 @@ const getUserProfile = async (req, res) => {
       .populate('author', 'name email avatar isVerified')
       .sort({ createdAt: -1 });
 
+    // Get user's reviews
+    const reviews = await Review.find({ reviewee: req.params.id })
+      .populate('reviewer', 'name avatar')
+      .sort({ createdAt: -1 });
+
+    // Calculate average rating
+    let averageRating = 0;
+    if (reviews.length > 0) {
+      averageRating = reviews.reduce((acc, curr) => acc + curr.rating, 0) / reviews.length;
+    }
+
     res.status(200).json({
       success: true,
       data: {
         user,
         posts,
+        reviews,
+        averageRating: averageRating.toFixed(1),
         postsCount: posts.length,
         followersCount: user.followers.length,
         followingCount: user.following.length,
@@ -210,10 +224,71 @@ const searchUsers = async (req, res) => {
   }
 };
 
+// @desc    Add a review for a user
+// @route   POST /api/users/:id/review
+// @access  Private
+const addReview = async (req, res) => {
+  try {
+    const revieweeId = req.params.id;
+    const reviewerId = req.user._id;
+
+    if (revieweeId === reviewerId.toString()) {
+      return res.status(400).json({
+        success: false,
+        message: 'You cannot review yourself',
+      });
+    }
+
+    const { rating, label, comment } = req.body;
+
+    if (!rating || rating < 1 || rating > 5) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide a valid rating between 1 and 5',
+      });
+    }
+
+    const review = await Review.create({
+      rating,
+      label,
+      comment,
+      reviewer: reviewerId,
+      reviewee: revieweeId,
+    });
+
+    const populatedReview = await Review.findById(review._id)
+      .populate('reviewer', 'name avatar');
+
+    // Make notification
+    const notification = await Notification.create({
+      recipient: revieweeId,
+      sender: reviewerId,
+      type: 'verification', // re-using as general alert
+      message: `${req.user.name} left you a ${rating}-star review`,
+    });
+    const popNotif = await Notification.findById(notification._id).populate('sender', 'name avatar');
+    const io = req.app.get('io');
+    if (io) emitToUser(io, revieweeId, 'new-notification', popNotif);
+
+    res.status(201).json({
+      success: true,
+      message: 'Review added successfully',
+      data: populatedReview,
+    });
+  } catch (error) {
+    console.error('Add review error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
 module.exports = {
   getUserProfile,
   toggleFollow,
   getFollowers,
   getFollowing,
   searchUsers,
+  addReview,
 };

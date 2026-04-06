@@ -5,6 +5,7 @@ import Button from '../components/Button';
 import PostCard from '../components/PostCard';
 import { postsAPI } from '../services/api';
 import SEO from '../components/common/SEO';
+import Toast from '../components/Toast';
 
 const PostDetailsPage = () => {
   const { id } = useParams();
@@ -13,6 +14,31 @@ const PostDetailsPage = () => {
   const [selectedImage, setSelectedImage] = useState(0);
   const [loading, setLoading] = useState(true);
   
+  // Report states
+  const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+  const [reportReason, setReportReason] = useState('Spam');
+  const [reportDetails, setReportDetails] = useState('');
+  const [isSubmittingReport, setIsSubmittingReport] = useState(false);
+  const [toast, setToast] = useState({ show: false, message: '', type: '' });
+
+  const handleReportSubmit = async (e) => {
+    e.preventDefault();
+    if (!reportReason) return;
+    setIsSubmittingReport(true);
+    try {
+      const response = await postsAPI.reportPost(post._id, { reason: reportReason, details: reportDetails });
+      if (response.data.success) {
+        setToast({ show: true, message: 'Post reported securely to admins', type: 'success' });
+        setIsReportModalOpen(false);
+        setReportDetails('');
+      }
+    } catch (error) {
+      setToast({ show: true, message: error.response?.data?.message || 'Failed to report post', type: 'error' });
+    } finally {
+      setIsSubmittingReport(false);
+    }
+  };
+
   useEffect(() => {
     const fetchPost = async () => {
       try {
@@ -61,8 +87,9 @@ const PostDetailsPage = () => {
   const postImages = Array.isArray(post.images) ? post.images : [post.image];
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-8">
-      <SEO title={`${post.title} | ShareSphere`} description={post.description} />
+    <>
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-8">
+        <SEO title={`${post.title} | ShareSphere`} description={post.description} />
       <div className="container-custom max-w-6xl">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -164,26 +191,34 @@ const PostDetailsPage = () => {
                 {post.description}
               </p>
 
-              <div className="flex items-center gap-4 pt-6 border-t border-gray-200 dark:border-gray-700">
-                <button className="flex items-center gap-2 px-4 py-2 text-gray-700 dark:text-gray-300 hover:text-red-500 transition-colors">
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-                  </svg>
-                  <span>{post.likes} Likes</span>
-                </button>
-                <button className="flex items-center gap-2 px-4 py-2 text-gray-700 dark:text-gray-300 hover:text-primary-500 transition-colors">
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
-                  </svg>
-                  <span>Save</span>
-                </button>
-                <button className="flex items-center gap-2 px-4 py-2 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 transition-colors">
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
-                  </svg>
-                  <span>Share</span>
-                </button>
-              </div>
+                <div className="flex items-center gap-2 sm:gap-4 pt-6 border-t border-gray-200 dark:border-gray-700 flex-wrap">
+                  <button className="flex items-center gap-1.5 px-3 py-2 text-gray-700 dark:text-gray-300 hover:text-red-500 transition-colors rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                    </svg>
+                    <span className="text-sm font-medium">{post.likes} Likes</span>
+                  </button>
+                  <button className="flex items-center gap-1.5 px-3 py-2 text-gray-700 dark:text-gray-300 hover:text-primary-500 transition-colors rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+                    </svg>
+                    <span className="text-sm font-medium">Save</span>
+                  </button>
+                  <button className="flex items-center gap-1.5 px-3 py-2 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 transition-colors rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                    </svg>
+                    <span className="text-sm font-medium">Share</span>
+                  </button>
+                  <button 
+                    onClick={() => setIsReportModalOpen(true)}
+                    className="flex items-center gap-1.5 px-3 py-2 text-gray-700 dark:text-gray-300 hover:text-red-500 transition-colors rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 sm:ml-auto">
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3.L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                    <span className="text-sm font-medium">Report</span>
+                  </button>
+                </div>
             </div>
           </div>
 
@@ -212,6 +247,29 @@ const PostDetailsPage = () => {
                   <p className="text-sm text-gray-500 dark:text-gray-400">
                     {post.author.email}
                   </p>
+                  {post.author.reviewsCount > 0 ? (
+                    <Link 
+                      to={`/profile/${post.author._id}`} 
+                      state={{ activeTab: 'reviews' }}
+                      className="flex items-center gap-1 mt-1 text-sm text-yellow-500 hover:text-yellow-600 transition-colors"
+                    >
+                      <div className="flex items-center">
+                        {Array.from({ length: 5 }).map((_, i) => (
+                          <span key={i} className={i < Math.floor(post.author.averageRating) ? 'text-yellow-400' : 'text-gray-300 dark:text-gray-600'}>★</span>
+                        ))}
+                      </div>
+                      <span className="font-medium ml-1">{post.author.averageRating}</span>
+                      <span className="text-gray-400">({post.author.reviewsCount})</span>
+                    </Link>
+                  ) : (
+                    <Link 
+                      to={`/profile/${post.author._id}`} 
+                      state={{ activeTab: 'reviews' }}
+                      className="text-xs text-primary-500 hover:underline mt-1 block"
+                    >
+                      Be the first to review
+                    </Link>
+                  )}
                 </div>
               </div>
               <div className="space-y-2">
@@ -236,7 +294,7 @@ const PostDetailsPage = () => {
               <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
                 If you find this post inappropriate or violating community guidelines
               </p>
-              <Button variant="danger" size="sm" className="w-full">
+              <Button variant="danger" size="sm" className="w-full" onClick={() => setIsReportModalOpen(true)}>
                 Report Post
               </Button>
             </div>
@@ -258,6 +316,73 @@ const PostDetailsPage = () => {
         )}
       </div>
     </div>
+
+      {/* Report Modal */}
+      {isReportModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-white dark:bg-gray-800 rounded-2xl p-6 w-full max-w-md shadow-xl"
+          >
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-xl font-bold text-gray-900 dark:text-white">Report Post</h3>
+              <button 
+                onClick={() => setIsReportModalOpen(false)}
+                className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+            
+            <form onSubmit={handleReportSubmit} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Reason</label>
+                <select 
+                  value={reportReason}
+                  onChange={(e) => setReportReason(e.target.value)}
+                  className="w-full px-4 py-2 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-primary-500"
+                >
+                  <option value="Spam">Spam</option>
+                  <option value="Inappropriate Content">Inappropriate Content</option>
+                  <option value="Scam or Fraud">Scam or Fraud</option>
+                  <option value="Harassment">Harassment</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Additional Details (Optional)</label>
+                <textarea 
+                  value={reportDetails}
+                  onChange={(e) => setReportDetails(e.target.value)}
+                  rows={4}
+                  className="w-full px-4 py-2 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-primary-500"
+                  placeholder="Provide more details to help admins..."
+                />
+              </div>
+              
+              <div className="flex justify-end gap-3 mt-6">
+                <Button type="button" variant="outline" onClick={() => setIsReportModalOpen(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit" variant="primary" disabled={isSubmittingReport}>
+                  {isSubmittingReport ? 'Reporting...' : 'Submit Report'}
+                </Button>
+              </div>
+            </form>
+          </motion.div>
+        </div>
+      )}
+
+      {toast.show && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast({ show: false, message: '', type: '' })}
+        />
+      )}
+    </>
   );
 };
 

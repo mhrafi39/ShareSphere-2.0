@@ -24,8 +24,6 @@ import CreatePostPage from './pages/CreatePostPage';
 import PostDetailsPage from './pages/PostDetailsPage';
 import SettingsPage from './pages/SettingsPage';
 import AdminDashboard from './pages/AdminDashboard';
-import AdminVerification from './pages/AdminVerification';
-import AdminUsersPage from './pages/AdminUsersPage';
 import VerifyNIDPage from './pages/VerifyNIDPage';
 import SavedPage from './pages/SavedPage';
 import NotFoundPage from './pages/NotFoundPage';
@@ -102,8 +100,6 @@ function AppRoutes() {
         
         {/* Admin Routes - Require admin role */}
         <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
-        <Route path="/admin/verify" element={<AdminRoute><AdminVerification /></AdminRoute>} />
-        <Route path="/admin/users" element={<AdminRoute><AdminUsersPage /></AdminRoute>} />
         
         {/* 404 Page */}
         <Route path="*" element={<NotFoundPage />} />

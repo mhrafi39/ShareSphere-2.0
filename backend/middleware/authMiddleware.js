@@ -27,6 +27,13 @@ const protect = async (req, res, next) => {
         });
       }
 
+      if (req.user.isBanned) {
+        return res.status(403).json({
+          success: false,
+          message: 'Your account has been banned for violating community guidelines.',
+        });
+      }
+
       return next();
     } catch (error) {
       console.error(error);

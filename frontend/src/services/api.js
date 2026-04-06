@@ -84,6 +84,7 @@ export const postsAPI = {
   toggleShare: (id) => api.post(`/posts/${id}/share`),
   requestBorrow: (id, data) => api.post(`/posts/${id}/request`, data),
   getSavedPosts: () => api.get('/posts/saved/all'),
+  reportPost: (id, data) => api.post(`/posts/${id}/report`, data),
 };
 
 // Users API calls
@@ -92,7 +93,8 @@ export const usersAPI = {
   toggleFollow: (id) => api.post(`/users/${id}/follow`),
   getFollowers: (id) => api.get(`/users/${id}/followers`),
   getFollowing: (id) => api.get(`/users/${id}/following`),
-  searchUsers: (query) => api.get('/users/search', { params: { query } }),
+  searchUsers: (query) => api.get(`/users/search?query=${query}`),
+  addReview: (id, data) => api.post(`/users/${id}/review`, data),
 };
 
 // Notifications API calls
@@ -119,6 +121,10 @@ export const adminAPI = {
   getAllUsers: (params) => api.get('/admin/users', { params }),
   getRecentUsers: (limit = 5) => api.get('/admin/users/recent', { params: { limit } }),
   getRecentPosts: (limit = 5) => api.get('/admin/posts/recent', { params: { limit } }),
+  getReports: (status) => api.get(`/admin/reports${status ? `?status=${status}` : ''}`),
+  resolveReport: (reportId, status) => api.patch(`/admin/reports/${reportId}/resolve`, { status }),
+  deletePostByAdmin: (postId) => api.delete(`/admin/posts/${postId}`),
+  toggleUserBan: (userId) => api.patch(`/admin/users/${userId}/ban`),
   getPendingVerifications: () => api.get('/admin/verifications/pending'),
   approveVerification: (userId) => api.put(`/admin/verifications/${userId}/approve`),
   rejectVerification: (userId, data) => api.put(`/admin/verifications/${userId}/reject`, data),

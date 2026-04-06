@@ -10,6 +10,10 @@ const {
   getDashboardStats,
   getRecentUsers,
   getRecentPosts,
+  getReports,
+  resolveReport,
+  deletePostByAdmin,
+  toggleUserBan,
 } = require('../controllers/adminController');
 const { protect, admin } = require('../middleware/authMiddleware');
 
@@ -23,5 +27,9 @@ router.put('/verifications/:userId/approve', protect, admin, approveVerification
 router.put('/verifications/:userId/reject', protect, admin, rejectVerification);
 router.delete('/users/:userId', protect, admin, deleteUser);
 router.put('/users/:userId/role', protect, admin, toggleUserRole);
+router.get('/reports', protect, admin, getReports);
+router.patch('/reports/:reportId/resolve', protect, admin, resolveReport);
+router.delete('/posts/:postId', protect, admin, deletePostByAdmin);
+router.patch('/users/:userId/ban', protect, admin, toggleUserBan);
 
 module.exports = router;

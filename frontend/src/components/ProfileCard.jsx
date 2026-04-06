@@ -66,14 +66,21 @@ const ProfileCard = ({ user, postsCount = 0 }) => {
             <p className="text-sm text-gray-600 dark:text-gray-400">Posts</p>
           </div>
           <div>
-            <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-              {user.rating || 0}
-            </p>
-            <p className="text-sm text-gray-600 dark:text-gray-400">Rating</p>
+            <div className="flex flex-col items-center">
+              <div className="flex items-center text-yellow-400 mb-1">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <span key={i} className={`text-sm ${i < Math.floor(user.averageRating || 0) ? 'fill-current' : 'text-gray-300 dark:text-gray-600'}`}>★</span>
+                ))}
+              </div>
+              <p className="text-xl font-bold text-gray-900 dark:text-gray-100 leading-none">
+                {user.averageRating || '0.0'}
+              </p>
+            </div>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Rating</p>
           </div>
           <div>
-            <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-              {user.verified ? 'Yes' : 'No'}
+            <p className="text-xl font-bold text-gray-900 dark:text-gray-100">
+              {user.verificationStatus === 'verified' || user.nidVerified ? 'Yes' : 'No'}
             </p>
             <p className="text-sm text-gray-600 dark:text-gray-400">Verified</p>
           </div>
