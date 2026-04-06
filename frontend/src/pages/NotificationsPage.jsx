@@ -6,6 +6,7 @@ import { setNotifications, markAsRead, markAllAsRead as markAllReadAction, clear
 import NotificationItem from '../components/NotificationItem';
 import Button from '../components/Button';
 import { notificationsAPI } from '../services/api';
+import SEO from '../components/common/SEO';
 
 const NotificationsPage = () => {
   const dispatch = useDispatch();
@@ -86,6 +87,7 @@ const NotificationsPage = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-8">
+      <SEO title="Notifications | ShareSphere" />
       <div className="container-custom max-w-3xl">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">

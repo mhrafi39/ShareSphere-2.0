@@ -9,6 +9,7 @@ import Button from '../components/Button';
 import Modal from '../components/Modal';
 import Input from '../components/Input';
 import { usersAPI, postsAPI, authAPI } from '../services/api';
+import SEO from '../components/common/SEO';
 
 const ProfilePage = () => {
   const { userId } = useParams();
@@ -217,6 +218,7 @@ const ProfilePage = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-8">
+      <SEO title={`${profileUser?.name || 'Profile'} | ShareSphere`} />
       <div className="container-custom">
         {/* Verification Alert */}
         {showVerificationAlert && (

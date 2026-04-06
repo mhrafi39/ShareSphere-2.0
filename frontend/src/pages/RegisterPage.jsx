@@ -7,6 +7,7 @@ import Button from '../components/Button';
 import Toast from '../components/Toast';
 import { motion } from 'framer-motion';
 import { authAPI } from '../services/api';
+import SEO from '../components/common/SEO';
 
 const RegisterPage = () => {
   const [loading, setLoading] = useState(false);
@@ -95,6 +96,7 @@ const RegisterPage = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-primary-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 flex items-center justify-center py-12 px-4">
+      <SEO title="Register | ShareSphere" />
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}

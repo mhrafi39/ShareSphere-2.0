@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import Button from '../components/Button';
 import PostCard from '../components/PostCard';
 import { postsAPI } from '../services/api';
+import SEO from '../components/common/SEO';
 
 const PostDetailsPage = () => {
   const { id } = useParams();
@@ -61,6 +62,7 @@ const PostDetailsPage = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-8">
+      <SEO title={`${post.title} | ShareSphere`} description={post.description} />
       <div className="container-custom max-w-6xl">
         <motion.div
           initial={{ opacity: 0, y: 20 }}

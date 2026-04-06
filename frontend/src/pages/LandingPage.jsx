@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import PostCard from '../components/PostCard';
 import { postsAPI } from '../services/api';
+import SEO from '../components/common/SEO';
 
 const LandingPage = () => {
   const [featuredPosts, setFeaturedPosts] = useState([]);
@@ -35,6 +36,7 @@ const LandingPage = () => {
 
   return (
     <div className="min-h-screen">
+      <SEO title="Welcome to ShareSphere" />
       {/* Hero Section */}
       <section className="bg-gradient-to-br from-primary-50 via-white to-primary-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 py-20">
         <div className="container-custom">

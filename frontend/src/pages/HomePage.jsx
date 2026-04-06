@@ -6,6 +6,7 @@ import PostCard from '../components/PostCard';
 import { SkeletonPostCard } from '../components/Skeleton';
 import { categories } from '../utils/dummyData';
 import { postsAPI } from '../services/api';
+import SEO from '../components/common/SEO';
 
 const HomePage = () => {
   const currentUser = useSelector((state) => state.auth.user);
@@ -65,6 +66,7 @@ const HomePage = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-6">
+      <SEO title="Feed | ShareSphere" />
       <div className="container-custom max-w-4xl">
         {/* Create Post Card - Only show when user is logged in */}
         {currentUser && (

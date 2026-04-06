@@ -4,6 +4,7 @@ import { useSelector } from 'react-redux';
 import PostCard from '../components/PostCard';
 import { SkeletonPostCard } from '../components/Skeleton';
 import { postsAPI } from '../services/api';
+import SEO from '../components/common/SEO';
 
 const SavedPage = () => {
   const currentUser = useSelector((state) => state.auth.user);
@@ -30,6 +31,7 @@ const SavedPage = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-6">
+      <SEO title="Saved Resources | ShareSphere" />
       <div className="container-custom max-w-4xl">
         {/* Header */}
         <div className="mb-6">

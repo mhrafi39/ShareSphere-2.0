@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import Sidebar from '../layouts/Sidebar';
 import { adminAPI } from '../services/api';
+import SEO from '../components/common/SEO';
 
 const AdminDashboard = () => {
   const [timeRange, setTimeRange] = useState('week');
@@ -87,6 +88,7 @@ const AdminDashboard = () => {
 
   return (
     <div className="flex min-h-screen bg-gray-50 dark:bg-gray-900">
+      <SEO title="Admin Dashboard | ShareSphere" />
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       <div className="flex-1 w-full lg:w-auto">
         {/* Mobile Header */}

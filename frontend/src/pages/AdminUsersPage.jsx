@@ -5,6 +5,7 @@ import Input from '../components/Input';
 import Modal from '../components/Modal';
 import Sidebar from '../layouts/Sidebar';
 import { adminAPI } from '../services/api';
+import SEO from '../components/common/SEO';
 
 const AdminUsersPage = () => {
   const [users, setUsers] = useState([]);
@@ -125,6 +126,7 @@ const AdminUsersPage = () => {
 
   return (
     <div className="flex min-h-screen bg-gray-50 dark:bg-gray-900">
+      <SEO title="Manage Users | Admin | ShareSphere" />
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       <div className="flex-1 w-full lg:w-auto">
         {/* Mobile Header */}

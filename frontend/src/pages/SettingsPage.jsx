@@ -7,6 +7,7 @@ import Button from '../components/Button';
 import Input from '../components/Input';
 import Modal from '../components/Modal';
 import { authAPI } from '../services/api';
+import SEO from '../components/common/SEO';
 
 const SettingsPage = () => {
   const dispatch = useDispatch();
@@ -145,6 +146,7 @@ const SettingsPage = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-8">
+      <SEO title="Settings | ShareSphere" />
       <div className="container-custom max-w-5xl">
         <motion.div
           initial={{ opacity: 0, y: 20 }}

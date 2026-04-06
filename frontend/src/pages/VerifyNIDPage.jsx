@@ -6,6 +6,7 @@ import Button from '../components/Button';
 import Input from '../components/Input';
 import { authAPI } from '../services/api';
 import { updateUser } from '../features/authSlice';
+import SEO from '../components/common/SEO';
 
 const VerifyNIDPage = () => {
   const dispatch = useDispatch();
@@ -129,6 +130,7 @@ const VerifyNIDPage = () => {
   if (currentUser.verificationStatus === 'verified') {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center py-12 px-4">
+        <SEO title="ID Verified | ShareSphere" />
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -157,6 +159,7 @@ const VerifyNIDPage = () => {
   if (currentUser.verificationStatus === 'pending') {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center py-12 px-4">
+        <SEO title="Verification Pending | ShareSphere" />
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -183,6 +186,7 @@ const VerifyNIDPage = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-12 px-4">
+      <SEO title="ID Verification | ShareSphere" />
       <div className="container-custom max-w-3xl">
         <motion.div
           initial={{ opacity: 0, y: 20 }}

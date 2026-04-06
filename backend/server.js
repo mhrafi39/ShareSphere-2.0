@@ -1,4 +1,7 @@
 require('dotenv').config();
+const dns = require('dns');
+// Workaround for 'querySrv ECONNREFUSED' error caused by local ISP/DNS blocking MongoDB Atlas SRV records
+dns.setServers(['8.8.8.8', '1.1.1.1']);
 const express = require('express');
 const http = require('http');
 const cors = require('cors');

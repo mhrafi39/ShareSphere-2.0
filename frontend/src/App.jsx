@@ -3,6 +3,7 @@ import { Provider, useDispatch, useSelector } from 'react-redux';
 import { useEffect, useState } from 'react';
 import { store } from './store/store';
 import { SocketProvider } from './context/SocketContext';
+import { HelmetProvider } from 'react-helmet-async';
 import MainLayout from './layouts/MainLayout';
 import { ProtectedRoute, AdminRoute, PublicRoute, VerifiedRoute } from './utils/ProtectedRoute';
 import { authAPI, notificationsAPI } from './services/api';
@@ -112,15 +113,17 @@ function AppRoutes() {
 
 function App() {
   return (
-    <div className="bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 min-h-screen">
-      <Provider store={store}>
-        <SocketProvider>
-          <Router>
-            <AppRoutes />
-          </Router>
-        </SocketProvider>
-      </Provider>
-    </div>
+    <HelmetProvider>
+      <div className="bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 min-h-screen">
+        <Provider store={store}>
+          <SocketProvider>
+            <Router>
+              <AppRoutes />
+            </Router>
+          </SocketProvider>
+        </Provider>
+      </div>
+    </HelmetProvider>
   );
 }
 

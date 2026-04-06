@@ -4,6 +4,7 @@ import { useSearchParams } from 'react-router-dom';
 import { messagesAPI, usersAPI } from '../services/api';
 import { useSelector } from 'react-redux';
 import { useSocket } from '../context/SocketContext';
+import SEO from '../components/common/SEO';
 
 const ChatPage = () => {
   const currentUser = useSelector((state) => state.auth.user);
@@ -166,6 +167,7 @@ const ChatPage = () => {
 
   return (
     <div className="h-[calc(100vh-4rem)] md:h-[calc(100vh-4rem)] bg-gray-50 dark:bg-gray-900">
+      <SEO title="Messages | ShareSphere" />
       <div className="container-custom h-full py-2 md:py-4">
         <div className="h-full bg-white dark:bg-gray-800 rounded-xl shadow-soft overflow-hidden flex">
           {/* Conversations List */}

@@ -7,6 +7,7 @@ import Input from '../components/Input';
 import Button from '../components/Button';
 import { categories } from '../utils/dummyData';
 import { postsAPI } from '../services/api';
+import SEO from '../components/common/SEO';
 
 const CreatePostPage = () => {
   const navigate = useNavigate();
@@ -89,6 +90,7 @@ const CreatePostPage = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-8">
+      <SEO title="Create Post | ShareSphere" />
       <div className="container-custom max-w-3xl">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
