@@ -9,6 +9,7 @@ import { ProtectedRoute, AdminRoute, PublicRoute, VerifiedRoute } from './utils/
 import { authAPI, notificationsAPI } from './services/api';
 import { setCredentials, logout } from './features/authSlice';
 import { setNotifications } from './features/notificationSlice';
+import ChatBotWidget from './components/ChatBotWidget';
 
 // Pages
 import LandingPage from './pages/LandingPage';
@@ -119,6 +120,7 @@ function App() {
           <SocketProvider>
             <Router>
               <AppRoutes />
+              <ChatBotWidget />
             </Router>
           </SocketProvider>
         </Provider>

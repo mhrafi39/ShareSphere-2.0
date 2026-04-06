@@ -126,4 +126,9 @@ export const adminAPI = {
   toggleUserRole: (userId) => api.put(`/admin/users/${userId}/role`),
 };
 
+// ChatBot API calls
+export const chatBotAPI = {
+  sendMessage: (data) => api.post('/chatbot/message', data),
+};
+
 export default api;
