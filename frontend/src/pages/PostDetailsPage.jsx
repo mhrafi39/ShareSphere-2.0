@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useSelector } from 'react-redux';
 import { motion } from 'framer-motion';
 import Button from '../components/Button';
 import PostCard from '../components/PostCard';
@@ -9,10 +10,14 @@ import Toast from '../components/Toast';
 
 const PostDetailsPage = () => {
   const { id } = useParams();
+  const navigate = useNavigate();
+  const currentUser = useSelector((state) => state.auth.user);
   const [post, setPost] = useState(null);
   const [relatedPosts, setRelatedPosts] = useState([]);
   const [selectedImage, setSelectedImage] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [liked, setLiked] = useState(false);
+  const [likeCount, setLikeCount] = useState(0);
   
   // Report states
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
@@ -39,6 +44,33 @@ const PostDetailsPage = () => {
     }
   };
 
+  const handleLike = async () => {
+    if (!currentUser) {
+      navigate('/login');
+      return;
+    }
+
+    try {
+      // Optimistic UI update
+      const newLiked = !liked;
+      const newLikeCount = newLiked ? likeCount + 1 : likeCount - 1;
+      setLiked(newLiked);
+      setLikeCount(newLikeCount);
+
+      // Call API
+      const response = await postsAPI.toggleLike(post._id);
+      if (response.data.success) {
+        setLikeCount(response.data.data.likes);
+        setLiked(response.data.data.liked);
+      }
+    } catch (error) {
+      console.error('Failed to toggle like:', error);
+      // Revert optimistic update on error
+      setLiked(!liked);
+      setLikeCount(liked ? likeCount + 1 : likeCount - 1);
+    }
+  };
+
   useEffect(() => {
     const fetchPost = async () => {
       try {
@@ -47,6 +79,20 @@ const PostDetailsPage = () => {
         if (response.data.success) {
           const postData = response.data.data;
           setPost(postData);
+          
+          // Set like state
+          const postLikes = Array.isArray(postData.likes) ? postData.likes : [];
+          setLikeCount(postLikes.length);
+          
+          // Check if current user has liked
+          if (currentUser && postLikes.length > 0) {
+            const isLiked = postLikes.some(like => 
+              like._id === currentUser._id || like === currentUser._id
+            );
+            setLiked(isLiked);
+          } else {
+            setLiked(false);
+          }
           
           // Fetch related posts
           const relatedResponse = await postsAPI.getPosts({ category: postData.category, limit: 3 });
@@ -64,7 +110,7 @@ const PostDetailsPage = () => {
     if (id) {
       fetchPost();
     }
-  }, [id]);
+  }, [id, currentUser]);
   
   if (loading) {
     return (
@@ -192,11 +238,22 @@ const PostDetailsPage = () => {
               </p>
 
                 <div className="flex items-center gap-2 sm:gap-4 pt-6 border-t border-gray-200 dark:border-gray-700 flex-wrap">
-                  <button className="flex items-center gap-1.5 px-3 py-2 text-gray-700 dark:text-gray-300 hover:text-red-500 transition-colors rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">
-                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <button 
+                    onClick={handleLike}
+                    className={`flex items-center gap-1.5 px-3 py-2 transition-colors rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 ${
+                      liked 
+                        ? 'text-red-500 hover:text-red-600' 
+                        : 'text-gray-700 dark:text-gray-300 hover:text-red-500'
+                    }`}>
+                    <svg 
+                      className="w-5 h-5" 
+                      fill={liked ? "currentColor" : "none"} 
+                      viewBox="0 0 24 24" 
+                      stroke="currentColor"
+                    >
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
                     </svg>
-                    <span className="text-sm font-medium">{post.likes} Likes</span>
+                    <span className="text-sm font-medium">{likeCount} Likes</span>
                   </button>
                   <button className="flex items-center gap-1.5 px-3 py-2 text-gray-700 dark:text-gray-300 hover:text-primary-500 transition-colors rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">
                     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -273,7 +330,7 @@ const PostDetailsPage = () => {
                 </div>
               </div>
               <div className="space-y-2">
-                <Link to="/chat">
+                <Link to={`/chat?user=${post.author._id}`}>
                   <Button variant="primary" className="w-full">
                     Send Message
                   </Button>

@@ -18,9 +18,11 @@ const PostCard = ({ post, onUpdate }) => {
   const [showShareMenu, setShowShareMenu] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showOptionsMenu, setShowOptionsMenu] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [likes, setLikes] = useState(post.likes?.length || 0);
   const [saves, setSaves] = useState(post.saves || 0);
   const [localPost, setLocalPost] = useState(post);
+  const [deleting, setDeleting] = useState(false);
   
   // Edit form states
   const [editForm, setEditForm] = useState({
@@ -163,6 +165,22 @@ const PostCard = ({ post, onUpdate }) => {
     navigate(`/chat?user=${post.author?._id || post.author}&post=${post._id}&title=${encodeURIComponent(post.title)}`);
   };
 
+  const handleDeletePost = async () => {
+    setDeleting(true);
+    try {
+      const response = await postsAPI.deletePost(post._id);
+      if (response.data.success) {
+        setShowDeleteModal(false);
+        if (onUpdate) onUpdate();
+      }
+    } catch (error) {
+      console.error('Failed to delete post:', error);
+      alert('Failed to delete post. Please try again.');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   const getStatusColor = (status) => {
     switch (status) {
       case 'available':
@@ -261,6 +279,18 @@ const PostCard = ({ post, onUpdate }) => {
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
                         </svg>
                         {localPost.status === 'available' ? 'Mark as Unavailable' : 'Mark as Available'}
+                      </button>
+                      <button
+                        onClick={() => {
+                          setShowDeleteModal(true);
+                          setShowOptionsMenu(false);
+                        }}
+                        className="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2 text-red-600 dark:text-red-400 border-t border-gray-200 dark:border-gray-700"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                        Delete Post
                       </button>
                     </>
                   ) : (
@@ -374,7 +404,7 @@ const PostCard = ({ post, onUpdate }) => {
             title="Report this post"
           >
             <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3.L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
             </svg>
             <span className="font-medium text-sm sm:text-base hidden xs:inline">Report</span>
           </motion.button>
@@ -492,6 +522,37 @@ const PostCard = ({ post, onUpdate }) => {
             </Button>
           </div>
         </form>
+      </Modal>
+
+      {/* Delete Confirmation Modal */}
+      <Modal
+        isOpen={showDeleteModal}
+        onClose={() => !deleting && setShowDeleteModal(false)}
+        title="Delete Post"
+      >
+        <div className="space-y-4">
+          <p className="text-gray-600 dark:text-gray-300">
+            Are you sure you want to delete this post? This action cannot be undone.
+          </p>
+          <div className="flex justify-end gap-3 pt-4">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => setShowDeleteModal(false)}
+              disabled={deleting}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="danger"
+              onClick={handleDeletePost}
+              disabled={deleting}
+            >
+              {deleting ? 'Deleting...' : 'Delete Post'}
+            </Button>
+          </div>
+        </div>
       </Modal>
     </motion.div>
   );

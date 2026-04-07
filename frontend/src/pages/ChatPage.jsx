@@ -41,29 +41,27 @@ const ChatPage = () => {
     const postId = searchParams.get('post');
     const postTitle = searchParams.get('title');
     
-    if (userId) {
-      // Check if conversation already exists
-      const existingConv = conversations.find(conv => {
-        const convUserId = conv.user?._id?.toString() || conv.user?.toString();
-        return convUserId === userId;
-      });
-      
-      if (existingConv) {
-        setActiveConversation(existingConv);
-        // If there's a post reference, pre-fill the message
-        if (postId && postTitle) {
-          setMessage(`Hi! I'm interested in your post: "${decodeURIComponent(postTitle)}". ${window.location.origin}/post/${postId}`);
-        }
-        // Remove the query parameters after handling
-        setSearchParams({});
-      } else {
-        // Create a new conversation placeholder
-        fetchUserAndStartConversation(userId, postId, postTitle);
-        // Remove the query parameters after handling
-        setSearchParams({});
+    if (!userId || !currentUser) return;
+
+    // Check if conversation already exists
+    const existingConv = conversations.find(conv => {
+      const convUserId = conv.user?._id?.toString() || conv.user?.toString();
+      return convUserId === userId;
+    });
+    
+    if (existingConv) {
+      setActiveConversation(existingConv);
+      if (postId && postTitle) {
+        setMessage(`Hi! I'm interested in your post: "${decodeURIComponent(postTitle)}". ${window.location.origin}/post/${postId}`);
       }
+      setSearchParams({});
+    } else {
+      // Create a new conversation placeholder
+      fetchUserAndStartConversation(userId, postId, postTitle).then(() => {
+        setSearchParams({});
+      });
     }
-  }, [searchParams, conversations]);
+  }, [searchParams, conversations, currentUser]);
 
   useEffect(() => {
     if (activeConversation) {
@@ -107,9 +105,11 @@ const ChatPage = () => {
         if (postId && postTitle) {
           setMessage(`Hi! I'm interested in your post: "${decodeURIComponent(postTitle)}". ${window.location.origin}/post/${postId}`);
         }
+        return true;
       }
     } catch (error) {
       console.error('Failed to fetch user:', error);
+      return false;
     }
   };
 
@@ -119,7 +119,7 @@ const ChatPage = () => {
       const response = await messagesAPI.getConversations();
       if (response.data.success) {
         setConversations(response.data.data);
-        if (response.data.data.length > 0) {
+        if (!activeConversation && response.data.data.length > 0) {
           setActiveConversation(response.data.data[0]);
         }
       }

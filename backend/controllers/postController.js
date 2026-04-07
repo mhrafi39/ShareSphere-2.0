@@ -104,6 +104,7 @@ const getPost = async (req, res) => {
   try {
     const post = await Post.findById(req.params.id)
       .populate('author', 'name email avatar bio location isVerified nidVerified verificationStatus')
+      .populate('likes', 'name avatar')
       .populate('borrowRequests.user', 'name email avatar');
 
     if (!post) {
